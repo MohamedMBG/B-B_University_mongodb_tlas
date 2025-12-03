@@ -1,6 +1,5 @@
 package com.example.bbuniversity.admin_panel;
 
-import android.annotation.SuppressLint;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Toast;
@@ -12,87 +11,109 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.bbuniversity.R;
 import com.example.bbuniversity.adapters.ManageAbsenceAdapter;
+import com.example.bbuniversity.api.ApiClient;
+import com.example.bbuniversity.api.ApiService;
 import com.example.bbuniversity.models.Abscence;
-import com.google.firebase.Timestamp;
-import com.google.firebase.firestore.DocumentReference;
-import com.google.firebase.firestore.DocumentSnapshot;
-import com.google.firebase.firestore.FirebaseFirestore;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
 
 public class ManageAbsencesActivity extends AppCompatActivity implements ManageAbsenceAdapter.OnJustifyListener {
 
     private String studentId;
     private final List<Abscence> absences = new ArrayList<>();
     private ManageAbsenceAdapter adapter;
-    private FirebaseFirestore db;
+
+    private ApiService apiService;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         EdgeToEdge.enable(this);
         setContentView(R.layout.activity_manage_absences);
-        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+        getWindow().getDecorView().setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+        );
 
         studentId = getIntent().getStringExtra("studentId");
-        if (studentId == null) {
+        if (studentId == null || studentId.isEmpty()) {
             Toast.makeText(this, "Student ID missing", Toast.LENGTH_SHORT).show();
             finish();
             return;
         }
 
-        db = FirebaseFirestore.getInstance();
+        apiService = ApiClient.getClient().create(ApiService.class);
 
-        @SuppressLint({"MissingInflatedId", "LocalSuppress"}) RecyclerView recycler = findViewById(R.id.recyclerAbsences);
+        RecyclerView recycler = findViewById(R.id.recyclerAbsences);
         recycler.setLayoutManager(new LinearLayoutManager(this));
         adapter = new ManageAbsenceAdapter(absences, this);
         recycler.setAdapter(adapter);
 
-        loadAbsences();
+        loadAbsencesFromMongo();
     }
 
-    private void loadAbsences() {
-        db.collection("users").document(studentId).collection("abscence").get()
-                .addOnSuccessListener(query -> {
-                    absences.clear();
-                    for (DocumentSnapshot doc : query.getDocuments()) {
-                        Abscence a = doc.toObject(Abscence.class);
-                        if (a != null) {
-                            a.setDocumentId(doc.getId());
-                            absences.add(a);
-                        }
-                    }
-                    adapter.updateData(absences);
-                })
-                .addOnFailureListener(e -> Toast.makeText(this, "Erreur: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+    private void loadAbsencesFromMongo() {
+        apiService.getStudentAbsences(studentId).enqueue(new Callback<List<Abscence>>() {
+            @Override
+            public void onResponse(Call<List<Abscence>> call,
+                                   Response<List<Abscence>> response) {
+                if (!response.isSuccessful() || response.body() == null) {
+                    Toast.makeText(ManageAbsencesActivity.this,
+                            "Erreur chargement absences (code " + response.code() + ")",
+                            Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
+                absences.clear();
+                absences.addAll(response.body());
+                adapter.updateData(absences);
+            }
+
+            @Override
+            public void onFailure(Call<List<Abscence>> call, Throwable t) {
+                Toast.makeText(ManageAbsencesActivity.this,
+                        "Erreur réseau : " + t.getMessage(),
+                        Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     @Override
     public void onJustify(Abscence absence) {
-        DocumentReference ref = db.collection("users").document(studentId)
-                .collection("abscence").document(absence.getDocumentId());
-        ref.update("justifiee", true)
-                .addOnSuccessListener(aVoid -> {
-                    adjustGrade(studentId, absence.getMatiere(), 0.2);
-                    loadAbsences();
-                })
-                .addOnFailureListener(e -> Toast.makeText(this, "Erreur: " + e.getMessage(), Toast.LENGTH_SHORT).show());
-    }
+        if (absence == null || absence.getId() == null) {
+            Toast.makeText(this, "Absence invalide", Toast.LENGTH_SHORT).show();
+            return;
+        }
 
-    private void adjustGrade(String uid, String matiere, double delta) {
-        DocumentReference ref = db.collection("users").document(uid).collection("notes").document(matiere);
-        ref.get().addOnSuccessListener(doc -> {
-            Double note = doc.getDouble("noteGenerale");
-            if (note != null) {
-                double newNote = note + delta;
-                Map<String, Object> update = new HashMap<>();
-                update.put("noteGenerale", newNote);
-                update.put("derniereMiseAJour", Timestamp.now());
-                ref.update(update);
-            }
-        });
+        apiService.justifyAbsence(studentId, absence.getId())
+                .enqueue(new Callback<Void>() {
+                    @Override
+                    public void onResponse(Call<Void> call, Response<Void> response) {
+                        if (!response.isSuccessful()) {
+                            Toast.makeText(ManageAbsencesActivity.this,
+                                    "Erreur justification (code " + response.code() + ")",
+                                    Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+
+                        Toast.makeText(ManageAbsencesActivity.this,
+                                "Absence justifiée et note mise à jour",
+                                Toast.LENGTH_SHORT).show();
+
+                        // recharger la liste depuis Mongo
+                        loadAbsencesFromMongo();
+                    }
+
+                    @Override
+                    public void onFailure(Call<Void> call, Throwable t) {
+                        Toast.makeText(ManageAbsencesActivity.this,
+                                "Erreur réseau : " + t.getMessage(),
+                                Toast.LENGTH_SHORT).show();
+                    }
+                });
     }
 }

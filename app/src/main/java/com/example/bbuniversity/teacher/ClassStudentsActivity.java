@@ -1,9 +1,11 @@
 package com.example.bbuniversity.teacher;
 
+import android.content.Intent;
 import android.os.Bundle;
-import android.util.Log;
 import android.view.View;
+import android.widget.ImageButton;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
@@ -12,32 +14,41 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.bbuniversity.R;
 import com.example.bbuniversity.adapters.StudentAdapter;
+import com.example.bbuniversity.api.ApiClient;
+import com.example.bbuniversity.api.ApiService;
 import com.example.bbuniversity.models.Etudiant;
-import com.google.firebase.firestore.DocumentSnapshot;
-import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.auth.FirebaseAuth;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
-public class ClassStudentsActivity extends AppCompatActivity implements StudentAdapter.OnStudentClickListener {
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+
+public class ClassStudentsActivity extends AppCompatActivity
+        implements StudentAdapter.OnStudentClickListener {
 
     private final List<Etudiant> students = new ArrayList<>();
     private StudentAdapter adapter;
     private String className;
     private String subject;
 
+    private ApiService apiService;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_class_students);
         EdgeToEdge.enable(this);
-        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+        getWindow().getDecorView().setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+        );
 
+        apiService = ApiClient.getClient().create(ApiService.class);
 
         className = getIntent().getStringExtra("class");
-        subject = getIntent().getStringExtra("subject");
+        subject   = getIntent().getStringExtra("subject");
 
         TextView title = findViewById(R.id.tvClassTitle);
         title.setText(className + " - " + subject);
@@ -47,79 +58,78 @@ public class ClassStudentsActivity extends AppCompatActivity implements StudentA
         adapter = new StudentAdapter(students, this);
         recycler.setAdapter(adapter);
 
-        loadStudents();
+        // 1. Find the back button by its ID
+        ImageButton btnBack = findViewById(R.id.btnBack);
+
+        // 2. Set the click listener
+        btnBack.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                // This triggers the default Android back navigation behavior
+                // It is equivalent to pressing the physical back button on the device.
+                getOnBackPressedDispatcher().onBackPressed();
+
+                // Alternatively, if you just want to close this specific activity:
+                // finish();
+            }
+        });
+
+        loadStudentsFromMongo();
     }
 
-    private String generateCodeClasse(int niveau, String filiere, String classe) {
-        return niveau + filiere + classe;
+    // --------- CHARGER LES ÉTUDIANTS DEPUIS MONGO ----------
+    private void loadStudentsFromMongo() {
+        apiService.getStudentsByClass(className).enqueue(new Callback<List<Etudiant>>() {
+            @Override
+            public void onResponse(Call<List<Etudiant>> call, Response<List<Etudiant>> response) {
+                if (!response.isSuccessful() || response.body() == null) {
+                    Toast.makeText(ClassStudentsActivity.this,
+                            "Erreur chargement étudiants (classe) code=" + response.code(),
+                            Toast.LENGTH_LONG).show();
+                    return;
+                }
+
+                students.clear();
+                students.addAll(response.body());
+                adapter.updateList(students);
+            }
+
+            @Override
+            public void onFailure(Call<List<Etudiant>> call, Throwable t) {
+                Toast.makeText(ClassStudentsActivity.this,
+                        "Erreur réseau étudiants : " + t.getMessage(),
+                        Toast.LENGTH_LONG).show();
+            }
+        });
     }
 
-
-    private void loadStudents() {
-        FirebaseFirestore.getInstance().collection("users")
-                .whereEqualTo("role", "student")
-                .whereEqualTo("classe", className)
-
-                .get()
-                .addOnCompleteListener(task -> {
-                    if (task.isSuccessful() && task.getResult() != null) {
-                        students.clear();
-                        for (DocumentSnapshot doc : task.getResult()) {
-                            try {
-                                Map<String, Object> data = new HashMap<>(doc.getData());
-
-                                // Ensure matricule is stored as String
-                                if (data.get("matricule") instanceof Number) {
-                                    data.put("matricule", String.valueOf(data.get("matricule")));
-                                }
-
-                                String codeClasse = data.containsKey("codeClasse")
-                                        ? (String) data.get("codeClasse")
-                                        : generateCodeClasse(
-                                        ((Number) data.getOrDefault("niveau", 0)).intValue(),
-                                        (String) data.getOrDefault("filiere", ""),
-                                        (String) data.getOrDefault("classe", "")
-                                );
-
-                                Etudiant e = new Etudiant(
-                                        doc.getId(),
-                                        (String) data.get("nom"),
-                                        (String) data.get("prenom"),
-                                        (String) data.get("email"),
-                                        (String) data.get("matricule"),
-                                        ((Number) data.getOrDefault("niveau", 0)).intValue(),
-                                        (String) data.get("filiere"),
-                                        codeClasse
-                                );
-                                e.setClasse((String) data.get("classe"));
-                                students.add(e);
-                            } catch (Exception ex) {
-                                Log.e("StudentLoadError", "Error mapping student: " + ex.getMessage());
-                            }
-                        }
-                        adapter.updateList(students);
-                    } else {
-                        Log.e("StudentLoadError", "Failed to load students" +
-                                (task.getException() != null ? ": " + task.getException().getMessage() : ""));
-                    }
-                    adapter.updateList(students);
-                });
-    }
+    // --------- CLIC SUR UN ÉTUDIANT ----------
 
     @Override
     public void onStudentClick(Etudiant student) {
-        // no-op
-        android.content.Intent intent = new android.content.Intent(this, com.example.bbuniversity.admin_panel.AddNoteActivity.class);
-        intent.putExtra("studentEmail", student.getEmail());
-        intent.putExtra("subject", subject);
-        String uid = com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser() != null ?
-                com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser().getUid() : null;
-        if (uid != null) intent.putExtra("professorId", uid);
+        Intent intent = new Intent(this, AddNoteActivity.class);
+
+        // ✅ maintenant : on envoie le UID (qui correspond à _id / uid dans Mongo)
+        // adapte selon ton modèle Etudiant: getUid() ou getId()
+        String studentUid = student.getUid();   // ou student.getId() si c’est comme ça que tu l’as nommé
+        intent.putExtra("studentId", studentUid);
+
+        // matière (nom ou id, selon ta logique serveur)
+        intent.putExtra("matiereId", subject);
+
+        // id interne du prof (Firebase UID)
+        String profUid = FirebaseAuth.getInstance().getCurrentUser() != null
+                ? FirebaseAuth.getInstance().getCurrentUser().getUid()
+                : null;
+        if (profUid != null) {
+            intent.putExtra("professorId", profUid);
+        }
+
         startActivity(intent);
     }
 
     @Override
-    public void onStudentLongClick(Etudiant student, android.view.View view) {
-        // no-op
+    public void onStudentLongClick(Etudiant student, View view) {
+        // Rien pour l’instant
     }
 }

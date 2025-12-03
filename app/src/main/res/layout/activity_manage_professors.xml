@@ -36,7 +36,7 @@
                 android:id="@+id/searchInput"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Search students..."
+                android:hint="Search professors..."
                 android:imeOptions="actionSearch"
                 android:inputType="text"/>
         </com.google.android.material.textfield.TextInputLayout>

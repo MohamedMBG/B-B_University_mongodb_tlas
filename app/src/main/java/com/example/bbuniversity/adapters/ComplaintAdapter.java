@@ -10,14 +10,15 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.bbuniversity.R;
 import com.example.bbuniversity.models.Complaint;
-import com.google.firebase.Timestamp;
 
-import java.text.DateFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 
 /**
- * RecyclerView adapter for displaying a list of Complaint objects.
+ * RecyclerView adapter for displaying a list of Complaint objects (Mongo version).
  */
 public class ComplaintAdapter
         extends RecyclerView.Adapter<ComplaintAdapter.ViewHolder> {
@@ -29,14 +30,22 @@ public class ComplaintAdapter
     private final List<Complaint> complaints;
     private final OnComplaintClickListener listener;
 
+    // pour parser les dates ISO venant du backend (ex: 2025-12-01T22:14:03.123Z)
+    private final SimpleDateFormat isoParser =
+            new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US);
+    private final SimpleDateFormat displayFormat =
+            new SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault());
+
     public ComplaintAdapter(List<Complaint> complaints,
                             OnComplaintClickListener listener) {
         this.complaints = complaints;
         this.listener   = listener;
     }
 
-    @NonNull @Override
-    public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+    @NonNull
+    @Override
+    public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent,
+                                         int viewType) {
         View v = LayoutInflater.from(parent.getContext())
                 .inflate(R.layout.item_complaint, parent, false);
         return new ViewHolder(v);
@@ -46,23 +55,44 @@ public class ComplaintAdapter
     public void onBindViewHolder(@NonNull ViewHolder holder, int pos) {
         Complaint c = complaints.get(pos);
 
-        holder.titleView.setText(c.getTitle());
-        holder.statusView.setText(c.getStatus());
-        holder.messageView.setText(c.getDescription());
+        // Titre
+        holder.titleView.setText(
+                c.getTitle() != null ? c.getTitle() : "Réclamation"
+        );
 
-        Timestamp ts = c.getDateFiled();
-        if (ts != null) {
-            holder.dateView.setText(
-                    DateFormat.getDateTimeInstance().format(ts.toDate())
-            );
+        // Statut
+        holder.statusView.setText(
+                c.getStatus() != null ? c.getStatus() : "pending"
+        );
+
+        // Message
+        holder.messageView.setText(
+                c.getDescription() != null ? c.getDescription() : ""
+        );
+
+        // Date (String ISO → jolie date)
+        String rawDate = c.getDateFiled();  // doit être String dans ton modèle
+        if (rawDate != null && !rawDate.isEmpty()) {
+            try {
+                Date d = isoParser.parse(rawDate);
+                holder.dateView.setText(displayFormat.format(d));
+            } catch (ParseException e) {
+                // si parse foire, on affiche brut
+                holder.dateView.setText(rawDate);
+            }
         } else {
             holder.dateView.setText("Date inconnue");
         }
 
-        holder.itemView.setOnClickListener(v -> listener.onComplaintClick(c));
+        holder.itemView.setOnClickListener(v -> {
+            if (listener != null) listener.onComplaintClick(c);
+        });
     }
 
-    @Override public int getItemCount() { return complaints.size(); }
+    @Override
+    public int getItemCount() {
+        return complaints != null ? complaints.size() : 0;
+    }
 
     static class ViewHolder extends RecyclerView.ViewHolder {
         final TextView titleView;

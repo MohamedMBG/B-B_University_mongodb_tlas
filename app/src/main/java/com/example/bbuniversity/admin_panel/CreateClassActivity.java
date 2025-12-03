@@ -9,17 +9,22 @@ import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.bbuniversity.R;
+import com.example.bbuniversity.api.ApiClient;
+import com.example.bbuniversity.api.ApiService;
 import com.google.android.material.textfield.TextInputEditText;
-import com.google.firebase.firestore.FirebaseFirestore;
 
 import java.util.HashMap;
 import java.util.Map;
+
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
 
 public class CreateClassActivity extends AppCompatActivity {
 
     private TextInputEditText etClassName;
     private Button btnCreate, btnCancel;
-    private FirebaseFirestore db;
+    private ApiService apiService;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -35,28 +40,55 @@ public class CreateClassActivity extends AppCompatActivity {
         etClassName = findViewById(R.id.etClassName);
         btnCreate = findViewById(R.id.btnCreateClass);
         btnCancel = findViewById(R.id.btnCancel);
-        db = FirebaseFirestore.getInstance();
+
+        apiService = ApiClient.getClient().create(ApiService.class);
 
         btnCreate.setOnClickListener(v -> addClass());
         btnCancel.setOnClickListener(v -> finish());
     }
 
     private void addClass() {
-        String name = etClassName.getText().toString().trim();
+        String name = etClassName.getText() != null
+                ? etClassName.getText().toString().trim()
+                : "";
+
         if (name.isEmpty()) {
             Toast.makeText(this, "Veuillez entrer le nom de la classe", Toast.LENGTH_SHORT).show();
             return;
         }
 
+        // Corps à envoyer à l’API
         Map<String, Object> data = new HashMap<>();
         data.put("name", name);
+        data.put("_id", name); //
 
-        db.collection("classes").document(name).set(data)
-                .addOnSuccessListener(r -> {
-                    Toast.makeText(this, "Classe créée", Toast.LENGTH_SHORT).show();
+        apiService.createClass(data).enqueue(new Callback<Void>() {
+            @Override
+            public void onResponse(Call<Void> call, Response<Void> response) {
+                if (response.isSuccessful()) {
+                    Toast.makeText(CreateClassActivity.this,
+                            "Classe créée dans MongoDB",
+                            Toast.LENGTH_SHORT).show();
                     finish();
-                })
-                .addOnFailureListener(e ->
-                        Toast.makeText(this, "Erreur: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+                } else {
+                    String err = "code=" + response.code();
+                    try {
+                        if (response.errorBody() != null) {
+                            err += " body=" + response.errorBody().string();
+                        }
+                    } catch (Exception ignored) {}
+                    Toast.makeText(CreateClassActivity.this,
+                            "Erreur API Mongo: " + err,
+                            Toast.LENGTH_LONG).show();
+                }
+            }
+
+            @Override
+            public void onFailure(Call<Void> call, Throwable t) {
+                Toast.makeText(CreateClassActivity.this,
+                        "Erreur réseau Mongo: " + t.getMessage(),
+                        Toast.LENGTH_LONG).show();
+            }
+        });
     }
 }

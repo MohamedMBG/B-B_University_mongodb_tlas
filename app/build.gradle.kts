@@ -59,4 +59,10 @@ dependencies {
     //smtp implementations
     implementation(libs.android.mail)
     implementation(libs.android.activation)
+    //added for api fetching and pushing data
+    implementation(libs.retrofit)
+    implementation(libs.converter.gson)
+    implementation(libs.okhttp)
+    implementation(libs.logging.interceptor)
+    implementation(libs.gson)
 }

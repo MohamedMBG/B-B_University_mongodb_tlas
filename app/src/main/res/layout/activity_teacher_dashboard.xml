@@ -38,15 +38,6 @@
             android:layout_weight="1"
             android:backgroundTint="@color/dark_green"
             android:text="Complaints" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnGrade"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:backgroundTint="@color/info_color"
-            android:layout_margin="5dp"
-            android:layout_weight="1"
-            android:text="Grade" />
     </LinearLayout>
 
 

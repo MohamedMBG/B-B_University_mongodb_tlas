@@ -4,7 +4,6 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
-import android.util.Log;
 import android.view.View;
 import android.widget.ImageView;
 
@@ -16,23 +15,29 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.bbuniversity.R;
 import com.example.bbuniversity.adapters.TeacherAdapter;
+import com.example.bbuniversity.api.ApiClient;
+import com.example.bbuniversity.api.ApiService;
 import com.example.bbuniversity.models.Professeur;
 import com.google.android.material.textfield.TextInputEditText;
-import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.QueryDocumentSnapshot;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class ManageProfessorsActivity extends AppCompatActivity implements TeacherAdapter.OnTeacherClickListener {
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+
+public class ManageProfessorsActivity extends AppCompatActivity
+        implements TeacherAdapter.OnTeacherClickListener {
 
     private RecyclerView teachersRv;
     private TeacherAdapter adapter;
-    private List<Professeur> teacherList = new ArrayList<>();
-    private List<Professeur> filteredTeachers = new ArrayList<>();
+    private final List<Professeur> teacherList = new ArrayList<>();
+    private final List<Professeur> filteredTeachers = new ArrayList<>();
     private TextInputEditText searchInput;
     private ImageView goBack;
-    private FirebaseFirestore db;
+
+    private ApiService apiService;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -40,41 +45,44 @@ public class ManageProfessorsActivity extends AppCompatActivity implements Teach
         setContentView(R.layout.activity_manage_professors);
         EdgeToEdge.enable(this);
 
-        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+        getWindow().getDecorView().setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+        );
 
+        // Init API client
+        apiService = ApiClient.getClient().create(ApiService.class);
 
-        // Initialisation des composants
+        // Views
         goBack = findViewById(R.id.btn_back);
         searchInput = findViewById(R.id.searchInput);
         teachersRv = findViewById(R.id.recyclerViewTeachers);
 
-        db = FirebaseFirestore.getInstance();
-
-        // Click sur bouton retour
         goBack.setOnClickListener(v -> finish());
 
-        // Setup du RecyclerView
+        // Recycler
         adapter = new TeacherAdapter(filteredTeachers, this);
         teachersRv.setLayoutManager(new LinearLayoutManager(this));
         teachersRv.setAdapter(adapter);
 
         fetchProfessors();
-        //activation de la barre de recherche :
         setupSearch();
     }
 
     private void setupSearch() {
         searchInput.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+            @Override public void afterTextChanged(Editable s) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
                 updateFilteredList(s != null ? s.toString() : "");
             }
-            @Override public void afterTextChanged(Editable s) {}
         });
     }
 
     private void updateFilteredList(String query) {
         filteredTeachers.clear();
+
         if (query == null || query.isEmpty()) {
             filteredTeachers.addAll(teacherList);
         } else {
@@ -105,29 +113,29 @@ public class ManageProfessorsActivity extends AppCompatActivity implements Teach
     }
 
     private void fetchProfessors() {
-        db.collection("users")
-                .whereEqualTo("role", "professor")
-                .get()
-                .addOnSuccessListener(querySnapshot -> {
-                    teacherList.clear();
-                    filteredTeachers.clear();
+        // Call GET /api/users?role=professor
+        apiService.getProfessors("professor").enqueue(new Callback<List<Professeur>>() {
+            @Override
+            public void onResponse(Call<List<Professeur>> call,
+                                   Response<List<Professeur>> response) {
+                if (!response.isSuccessful() || response.body() == null) {
+                    // you can log/Toast if you want
+                    return;
+                }
 
-                    Log.d("FIRESTORE", "Nombre de documents : " + querySnapshot.size()); // 🔥 Ajoute ça
+                teacherList.clear();
+                teacherList.addAll(response.body());
 
-                    for (QueryDocumentSnapshot doc : querySnapshot) {
-                        try {
-                            Professeur prof = doc.toObject(Professeur.class);
-                            Log.d("FIRESTORE", "Professeur récupéré : " + prof.getNom() + " " + prof.getPrenom()); // 🔥 et ça
-                            if (prof != null) {
-                                teacherList.add(prof);
-                                filteredTeachers.add(prof);
-                            }
-                        } catch (Exception e) {
-                            Log.e("FIRESTORE", "Erreur de mapping Professeur", e);
-                        }
-                    }
+                filteredTeachers.clear();
+                filteredTeachers.addAll(teacherList);
 
-                    adapter.notifyDataSetChanged();
-                });
+                adapter.notifyDataSetChanged();
+            }
+
+            @Override
+            public void onFailure(Call<List<Professeur>> call, Throwable t) {
+                // log / toast if needed
+            }
+        });
     }
 }

@@ -5,58 +5,69 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.bbuniversity.R;
 import com.example.bbuniversity.models.Abscence;
 
-import java.text.SimpleDateFormat;
 import java.util.List;
 
 public class AbsenceAdapter extends RecyclerView.Adapter<AbsenceAdapter.AbsenceViewHolder> {
+
     private List<Abscence> absences;
 
     public AbsenceAdapter(List<Abscence> absences) {
         this.absences = absences;
     }
 
+    @NonNull
     @Override
-    public AbsenceViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
-        View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.absence_item, parent, false);
+    public AbsenceViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        View view = LayoutInflater.from(parent.getContext())
+                .inflate(R.layout.absence_item, parent, false);
         return new AbsenceViewHolder(view);
     }
 
     @Override
-    public void onBindViewHolder(AbsenceViewHolder holder, int position) {
-        Abscence a = absences.get(position);
-        holder.subject.setText("Matière : " + a.getMatiere());
-        holder.justified.setText("Justifiée : " + (a.isJustifiee() ? "Oui" : "Non"));
-        holder.date.setText("Date : " + a.getDate().toString());
-
+    public void onBindViewHolder(@NonNull AbsenceViewHolder holder, int position) {
         Abscence absence = absences.get(position);
 
-        // Format the date to dd/MM/yyyy
-        SimpleDateFormat dateFormat = new SimpleDateFormat("dd/MM/yyyy");
-        String formattedDate = dateFormat.format(absence.getDate()); // assuming the date is a Date object
+        // Matière
+        holder.subject.setText("Matière : " + safe(absence.getMatiere()));
 
-        holder.date.setText(formattedDate);
-        holder.subject.setText(absence.getMatiere());
+        // Justifiée ou non
+        holder.justified.setText("Justifiée : " + (absence.isJustifiee() ? "Oui" : "Non"));
+
+        // Date : tu l’enregistres déjà au format "dd/MM/yyyy" dans AddAbsenceActivity
+        String dateStr = absence.getDate();
+        holder.date.setText(dateStr != null && !dateStr.isEmpty()
+                ? dateStr
+                : "Date inconnue");
     }
 
     @Override
     public int getItemCount() {
-        return absences.size();
+        return absences != null ? absences.size() : 0;
     }
 
-    class AbsenceViewHolder extends RecyclerView.ViewHolder {
+    public void updateData(List<Abscence> newList) {
+        this.absences = newList;
+        notifyDataSetChanged();
+    }
+
+    private String safe(String s) {
+        return s != null ? s : "";
+    }
+
+    static class AbsenceViewHolder extends RecyclerView.ViewHolder {
         TextView subject, justified, date;
 
-        public AbsenceViewHolder(View itemView) {
+        AbsenceViewHolder(@NonNull View itemView) {
             super(itemView);
-            subject = itemView.findViewById(R.id.abs_subject);
+            subject   = itemView.findViewById(R.id.abs_subject);
             justified = itemView.findViewById(R.id.abs_justified);
-            date = itemView.findViewById(R.id.abs_date);
-
+            date      = itemView.findViewById(R.id.abs_date);
         }
     }
 }

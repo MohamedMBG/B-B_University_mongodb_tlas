@@ -1,23 +1,36 @@
 package com.example.bbuniversity.models;
 
 public class User {
-    private String uid;
+
+    private String _id;        // ID MongoDB
+    private String uid;        // identique à _id pour l’instant
     private String nom;
     private String prenom;
     private String email;
     private String role;
 
+    private String classe;
+    private String codeClasse;
+    private String filiere;
+    private Integer matricule;
+    private Integer niveau;
+
+    private String password;
+
     public User() {}
 
-    public User(String uid, String nom, String prenom, String email, String role) {
-        this.uid = uid;
-        this.nom = nom;
-        this.prenom = prenom;
-        this.email = email;
-        this.role = role;
+    // --- GETTERS & SETTERS ---
+    public String get_id() {
+        return _id;
     }
 
-    // Getters / Setters
+    public String getPassword() {
+        return password;
+    }
+
+    public void set_id(String _id) {
+        this._id = _id;
+    }
 
     public String getUid() {
         return uid;
@@ -57,5 +70,45 @@ public class User {
 
     public void setRole(String role) {
         this.role = role;
+    }
+
+    public String getClasse() {
+        return classe;
+    }
+
+    public void setClasse(String classe) {
+        this.classe = classe;
+    }
+
+    public String getCodeClasse() {
+        return codeClasse;
+    }
+
+    public void setCodeClasse(String codeClasse) {
+        this.codeClasse = codeClasse;
+    }
+
+    public String getFiliere() {
+        return filiere;
+    }
+
+    public void setFiliere(String filiere) {
+        this.filiere = filiere;
+    }
+
+    public Integer getMatricule() {
+        return matricule;
+    }
+
+    public void setMatricule(int matricule) {
+        this.matricule = matricule;
+    }
+
+    public Integer getNiveau() {
+        return niveau;
+    }
+
+    public void setNiveau(int niveau) {
+        this.niveau = niveau;
     }
 }

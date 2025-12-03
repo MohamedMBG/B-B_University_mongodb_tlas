@@ -11,30 +11,35 @@ import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.bbuniversity.R;
-import com.example.bbuniversity.models.Etudiant;
+import com.example.bbuniversity.api.ApiClient;
+import com.example.bbuniversity.api.ApiService;
+import com.example.bbuniversity.models.Classe;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.UserProfileChangeRequest;
-import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.QueryDocumentSnapshot;
+import com.google.firebase.firestore.FirebaseFirestore; // encore utilisé si tu veux ailleurs
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+
 public class CreateStudentActivity extends AppCompatActivity {
 
     private TextInputEditText etEmail, etNom, etPassword, etPrenom;
-    private TextInputEditText etMatricule, etFiliere, etClasse, etNiveau;
+    private TextInputEditText etMatricule, etFiliere, etNiveau;
     private Button btnCreateStudent, cancel;
     private FirebaseAuth mAuth;
-    private FirebaseFirestore db;
+    private FirebaseFirestore db;   // plus utilisé pour les classes, mais tu peux le garder
 
     private AutoCompleteTextView classDropdown;
-    private List<String> classList = new ArrayList<>();
+    private final List<String> classList = new ArrayList<>();
 
-
+    private ApiService apiService;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -48,113 +53,133 @@ public class CreateStudentActivity extends AppCompatActivity {
         );
 
         mAuth = FirebaseAuth.getInstance();
-        db = FirebaseFirestore.getInstance();
+        db   = FirebaseFirestore.getInstance(); // plus nécessaire pour les classes
+        apiService = ApiClient.getClient().create(ApiService.class);
 
-        // Initialize views
-        etEmail = findViewById(R.id.etEmail);
-        etNom = findViewById(R.id.etNom);
-        etPassword = findViewById(R.id.etPassword);
-        etPrenom = findViewById(R.id.etPrenom);
+        // Views
+        etEmail     = findViewById(R.id.etEmail);
+        etNom       = findViewById(R.id.etNom);
+        etPassword  = findViewById(R.id.etPassword);
+        etPrenom    = findViewById(R.id.etPrenom);
         etMatricule = findViewById(R.id.etMatricule);
-        etFiliere = findViewById(R.id.etFiliere);
-        classDropdown = findViewById(R.id.classDropdown);
-        cancel = findViewById(R.id.btnCancel);
+        etFiliere   = findViewById(R.id.etFiliere);
+        etNiveau    = findViewById(R.id.etNiveau);
+        classDropdown     = findViewById(R.id.classDropdown);
+        btnCreateStudent  = findViewById(R.id.btnCreateStudent);
+        cancel            = findViewById(R.id.btnCancel);
 
         cancel.setOnClickListener(v -> finish());
-
-        etNiveau = findViewById(R.id.etNiveau);
-        btnCreateStudent = findViewById(R.id.btnCreateStudent);
-
         btnCreateStudent.setOnClickListener(v -> createStudent());
 
-        fetchClasses();
+        // 👉 maintenant on charge depuis Mongo
+        fetchClassesFromMongo();
     }
 
-    private void fetchClasses() {
-        db.collection("classes").get().addOnCompleteListener(task -> {
-            if (task.isSuccessful()) {
-                classList.clear();
-                for (QueryDocumentSnapshot doc : task.getResult()) {
-                    String className = doc.getString("name");
-                    if (className != null) classList.add(className);
+    /** Charge les classes depuis MongoDB via /api/classes */
+    private void fetchClassesFromMongo() {
+        apiService.getClassesMongo().enqueue(new Callback<List<Classe>>() {
+            @Override
+            public void onResponse(Call<List<Classe>> call,
+                                   Response<List<Classe>> response) {
+
+                if (!response.isSuccessful() || response.body() == null) {
+                    Toast.makeText(CreateStudentActivity.this,
+                            "Erreur chargement classes (Mongo), code=" + response.code(),
+                            Toast.LENGTH_SHORT).show();
+                    return;
                 }
 
-                ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
-                        android.R.layout.simple_dropdown_item_1line, classList);
+                classList.clear();
+                for (Classe c : response.body()) {
+                    if (c.getName() != null) {
+                        classList.add(c.getName());   // ex : "4IIR2"
+                    }
+                }
+
+                ArrayAdapter<String> adapter = new ArrayAdapter<>(
+                        CreateStudentActivity.this,
+                        android.R.layout.simple_dropdown_item_1line,
+                        classList
+                );
                 classDropdown.setAdapter(adapter);
-
-                // Add this to show dropdown when clicked
-                classDropdown.setOnClickListener(v -> {
-                    classDropdown.showDropDown();
-                });
-
-                // Set threshold to 1 character to show all options when clicked
+                classDropdown.setOnClickListener(v -> classDropdown.showDropDown());
                 classDropdown.setThreshold(1);
-            } else {
-                Toast.makeText(this, "Erreur lors du chargement des classes", Toast.LENGTH_SHORT).show();
+            }
+
+            @Override
+            public void onFailure(Call<List<Classe>> call, Throwable t) {
+                Toast.makeText(CreateStudentActivity.this,
+                        "Erreur réseau (Mongo classes): " + t.getMessage(),
+                        Toast.LENGTH_SHORT).show();
             }
         });
     }
 
-
     private void createStudent() {
-        String email = etEmail.getText().toString().trim();
-        String nom = etNom.getText().toString().trim();
-        String password = etPassword.getText().toString().trim();
-        String prenom = etPrenom.getText().toString().trim();
-        String matriculeStr = etMatricule.getText().toString().trim();
-        String filiere = etFiliere.getText().toString().trim();
-        String classe = classDropdown.getText().toString().trim();
-        String niveauStr = etNiveau.getText().toString().trim();
+        String email       = etEmail.getText().toString().trim();
+        String nom         = etNom.getText().toString().trim();
+        String password    = etPassword.getText().toString().trim();
+        String prenom      = etPrenom.getText().toString().trim();
+        String matriculeStr= etMatricule.getText().toString().trim();
+        String filiere     = etFiliere.getText().toString().trim();
+        String classe      = classDropdown.getText().toString().trim();
+        String niveauStr   = etNiveau.getText().toString().trim();
 
-        if (email.isEmpty() || nom.isEmpty() || password.isEmpty() || prenom.isEmpty() ||
-                matriculeStr.isEmpty() || filiere.isEmpty() || classe.isEmpty() || niveauStr.isEmpty()) {
+        if (email.isEmpty() || nom.isEmpty() || password.isEmpty() || prenom.isEmpty()
+                || matriculeStr.isEmpty() || filiere.isEmpty() || classe.isEmpty()
+                || niveauStr.isEmpty()) {
             Toast.makeText(this, "Veuillez remplir tous les champs", Toast.LENGTH_SHORT).show();
             return;
         }
 
         try {
             int matricule = Integer.parseInt(matriculeStr);
-            int niveau = Integer.parseInt(niveauStr);
+            int niveau    = Integer.parseInt(niveauStr);
 
-            // Generate the codeClasse in the format "niveau + filiere + classe"
             String codeClasse = niveauStr + filiere + classe;
 
             mAuth.createUserWithEmailAndPassword(email, password)
                     .addOnCompleteListener(authTask -> {
-                        if (authTask.isSuccessful()) {
+                        if (authTask.isSuccessful() && mAuth.getCurrentUser() != null) {
                             String uid = mAuth.getCurrentUser().getUid();
 
-                            UserProfileChangeRequest profileUpdates = new UserProfileChangeRequest.Builder()
-                                    .setDisplayName(prenom + " " + nom)
-                                    .build();
+                            UserProfileChangeRequest profileUpdates =
+                                    new UserProfileChangeRequest.Builder()
+                                            .setDisplayName(prenom + " " + nom)
+                                            .build();
 
                             mAuth.getCurrentUser().updateProfile(profileUpdates)
                                     .addOnCompleteListener(profileTask -> {
                                         if (profileTask.isSuccessful()) {
-                                            createFirestoreStudent(uid, email, nom, prenom, matricule, filiere, classe, niveau,codeClasse);
+                                            createMongoStudent(uid, email, nom, prenom,
+                                                    matricule, filiere, classe, niveau, codeClasse);
                                         } else {
                                             Toast.makeText(this,
-                                                    "Erreur de mise à jour du profil: " + profileTask.getException(),
+                                                    "Erreur profil: " + profileTask.getException(),
                                                     Toast.LENGTH_SHORT).show();
                                             mAuth.getCurrentUser().delete();
                                         }
                                     });
                         } else {
                             Toast.makeText(this,
-                                    "Erreur de création du compte: " + authTask.getException(),
+                                    "Erreur création compte: " + authTask.getException(),
                                     Toast.LENGTH_SHORT).show();
                         }
                     });
 
         } catch (NumberFormatException e) {
-            Toast.makeText(this, "Matricule et niveau doivent être des nombres", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this,
+                    "Matricule et niveau doivent être des nombres",
+                    Toast.LENGTH_SHORT).show();
         }
     }
 
-    private void createFirestoreStudent(String uid, String email, String nom, String prenom,
-                                        int matricule, String filiere, String classe, int niveau,String codeClasse) {
+    private void createMongoStudent(String uid, String email, String nom, String prenom,
+                                    int matricule, String filiere, String classe,
+                                    int niveau, String codeClasse) {
+
         Map<String, Object> studentData = new HashMap<>();
+        studentData.put("_id", uid);        // UID Firebase = _id Mongo
         studentData.put("uid", uid);
         studentData.put("email", email);
         studentData.put("nom", nom);
@@ -166,36 +191,27 @@ public class CreateStudentActivity extends AppCompatActivity {
         studentData.put("niveau", niveau);
         studentData.put("role", "student");
 
-        db.collection("users")
-                .document(uid)
-                .set(studentData)
-                .addOnSuccessListener(aVoid -> {
-                    Toast.makeText(this, "Étudiant créé avec succès", Toast.LENGTH_SHORT).show();
-
-                    // Optionnel : créer une note de base pour une matière (peut être supprimé)
-                    Map<String, Object> noteInit = new HashMap<>();
-                    noteInit.put("matiereId", "placeholder");
-                    noteInit.put("noteParticipation", 0.0);
-                    noteInit.put("noteCC", 0.0);
-                    noteInit.put("noteExamen", 0.0);
-                    noteInit.put("absencesNonJustifiees", 0);
-                    noteInit.put("noteTotale", 0.0);
-
-                    db.collection("users").document(uid)
-                            .collection("notes")
-                            .document("placeholder")
-                            .set(noteInit);
-
+        apiService.createUser(studentData).enqueue(new Callback<Void>() {
+            @Override
+            public void onResponse(Call<Void> call, Response<Void> response) {
+                if (response.isSuccessful()) {
+                    Toast.makeText(CreateStudentActivity.this,
+                            "Étudiant créé avec succès",
+                            Toast.LENGTH_SHORT).show();
                     finish();
-                })
-                .addOnFailureListener(e -> {
-                    Toast.makeText(this,
-                            "Erreur de création dans Firestore: " + e.getMessage() +
-                                    "\nLe compte d'authentification a été supprimé",
-                            Toast.LENGTH_LONG).show();
-                    mAuth.getCurrentUser().delete();
-                });
+                } else {
+                    Toast.makeText(CreateStudentActivity.this,
+                            "Erreur API (Mongo)",
+                            Toast.LENGTH_SHORT).show();
+                }
+            }
+
+            @Override
+            public void onFailure(Call<Void> call, Throwable t) {
+                Toast.makeText(CreateStudentActivity.this,
+                        "Erreur réseau: " + t.getMessage(),
+                        Toast.LENGTH_SHORT).show();
+            }
+        });
     }
-
-
 }

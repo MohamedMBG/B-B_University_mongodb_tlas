@@ -4,6 +4,7 @@ import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.View;
+import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
@@ -12,117 +13,164 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.bbuniversity.R;
 import com.example.bbuniversity.adapters.AbsenceAdapter;
+import com.example.bbuniversity.api.ApiClient;
+import com.example.bbuniversity.api.ApiService;
 import com.example.bbuniversity.models.Abscence;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
-import com.google.firebase.firestore.DocumentSnapshot;
-import com.google.firebase.firestore.FirebaseFirestore;
 
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+
 public class StudentAbsencesActivity extends AppCompatActivity {
 
-    // Firestore instance used to retrieve the absences
-    private final FirebaseFirestore db = FirebaseFirestore.getInstance();
-    // Storage for every absence loaded from Firestore
+    // Toutes les absences venant de Mongo
     private final List<Abscence> allAbsences = new ArrayList<>();
-    // Storage for only the absences that match the filters
+    // Absences filtrées affichées dans le RecyclerView
     private final List<Abscence> filteredAbsences = new ArrayList<>();
-    // Adapter displayed in the recycler view
     private AbsenceAdapter adapter;
 
-    @Override // entry point when the screen is created
+    // API Mongo
+    private ApiService apiService;
+
+    @Override
     protected void onCreate(Bundle savedInstanceState) {
-        // call parent implementation
         super.onCreate(savedInstanceState);
-        // allow drawing behind system bars
         EdgeToEdge.enable(this);
-        // display the activity layout
         setContentView(R.layout.activity_student_absences);
-        // hide navigation bar for immersive mode
+
         getWindow().getDecorView()
-                .setSystemUiVisibility(View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+                .setSystemUiVisibility(View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
 
-        // reference to the subject filter text field
+        apiService = ApiClient.getClient().create(ApiService.class);
+
         TextInputEditText etSubject = findViewById(R.id.etFilterSubject);
-        // reference to the date filter text field
-        TextInputEditText etDate = findViewById(R.id.etFilterDate);
-        // recycler view showing absences
-        RecyclerView recycler = findViewById(R.id.recyclerAbsences);
+        TextInputEditText etDate    = findViewById(R.id.etFilterDate);
+        RecyclerView recycler       = findViewById(R.id.recyclerAbsences);
 
-        // adapter driving the recycler view
         adapter = new AbsenceAdapter(filteredAbsences);
-        // layout manager arranging items vertically
         recycler.setLayoutManager(new LinearLayoutManager(this));
-        // connect adapter to recycler view
         recycler.setAdapter(adapter);
 
-        // fetch current logged in user
+        // 👤 Récupérer l'utilisateur courant (UID Firebase)
         FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-        // load user absences if available
-        if (user != null) loadAbsences(user.getUid());
+        if (user != null) {
+            loadAbsencesFromMongo(user.getUid());
+        } else {
+            Toast.makeText(this, "Utilisateur non connecté.", Toast.LENGTH_SHORT).show();
+        }
 
-        // watcher invoked whenever filter inputs change
+        // 🔍 Filtres sujet + date
         TextWatcher watcher = new SimpleWatcher() {
-            @Override // we only use afterTextChanged
+            @Override
             public void afterTextChanged(Editable s) {
-                // text from subject field or empty
                 String subj = etSubject.getText() == null ? "" : etSubject.getText().toString();
-                // text from date field or empty
                 String date = etDate.getText() == null ? "" : etDate.getText().toString();
-                // filter list accordingly
                 filterAbsences(subj, date);
             }
         };
-        // link watcher to subject field
         etSubject.addTextChangedListener(watcher);
-        // link watcher to date field
         etDate.addTextChangedListener(watcher);
     }
 
-    /** Fetch absences from Firestore for a user */
-    private void loadAbsences(String uid) {
-        // query the "abscence" sub collection of the user
-        db.collection("users").document(uid).collection("abscence").get()
-                .addOnSuccessListener(q -> {
-                    // remove old entries
-                    allAbsences.clear();
-                    // convert each document into an Abscence object
-                    for (DocumentSnapshot d : q.getDocuments()) {
-                        Abscence a = d.toObject(Abscence.class);
-                        if (a != null) allAbsences.add(a);
-                    }
-                    // show everything with no filter
-                    filterAbsences("", "");
-                });
+    /** Charge les absences depuis MongoDB via l'API */
+    private void loadAbsencesFromMongo(String studentId) {
+        apiService.getAbsences(studentId).enqueue(new Callback<List<Abscence>>() {
+            @Override
+            public void onResponse(Call<List<Abscence>> call, Response<List<Abscence>> response) {
+                if (!response.isSuccessful() || response.body() == null) {
+                    Toast.makeText(StudentAbsencesActivity.this,
+                            "Erreur de chargement des absences : code = " + response.code(),
+                            Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
+                allAbsences.clear();
+                allAbsences.addAll(response.body());
+
+                filteredAbsences.clear();
+                filteredAbsences.addAll(allAbsences);
+                adapter.updateData(filteredAbsences);
+            }
+
+            @Override
+            public void onFailure(Call<List<Abscence>> call, Throwable t) {
+                Toast.makeText(StudentAbsencesActivity.this,
+                        "Erreur réseau (absences) : " + t.getMessage(),
+                        Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
-    /** Filter absences by subject and date */
+    /** Filtre les absences par matière et date (dd/MM/yyyy tapé par l’étudiant) */
     private void filterAbsences(String subject, String dateStr) {
-        // reset the displayed list
         filteredAbsences.clear();
-        // formatter used for date comparison
-        SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault());
+
+        String qSubject = subject == null ? "" : subject.toLowerCase(Locale.ROOT);
+        String qDate    = dateStr == null ? "" : dateStr.trim();
+
         for (Abscence a : allAbsences) {
-            // check if subject text matches
-            boolean matchSubj = subject.isEmpty() ||
-                    (a.getMatiere() != null && a.getMatiere().toLowerCase().contains(subject.toLowerCase()));
-            // check if date text matches
-            boolean matchDate = dateStr.isEmpty() || sdf.format(a.getDate()).contains(dateStr);
-            // add when both conditions are true
-            if (matchSubj && matchDate) filteredAbsences.add(a);
+            boolean matchSubj =
+                    qSubject.isEmpty()
+                            || (a.getMatiere() != null &&
+                            a.getMatiere().toLowerCase(Locale.ROOT).contains(qSubject));
+
+            boolean matchDate = qDate.isEmpty() || dateMatches(a.getDate(), qDate);
+
+            if (matchSubj && matchDate) {
+                filteredAbsences.add(a);
+            }
         }
-        // refresh the recycler view
+
         adapter.notifyDataSetChanged();
     }
 
     /**
-     * Simplified TextWatcher to only override afterTextChanged.
+     * Compare la date renvoyée par l’API
+     * (format "yyyy-MM-dd" ou parfois ISO complet) au texte saisi (dd/MM/yyyy ou fragment).
      */
+    private boolean dateMatches(String rawDate, String query) {
+        if (rawDate == null || rawDate.isEmpty()) return false;
+        if (query == null || query.isEmpty()) return true;
+
+        // On tente plusieurs formats possibles venant de l’API
+        Date parsed = null;
+        String[] formats = {
+                "yyyy-MM-dd",                  // celui qu’on renvoie dans l’API
+                "yyyy-MM-dd'T'HH:mm:ss.SSSX"   // au cas où ce soit un ISO complet
+        };
+
+        for (String f : formats) {
+            try {
+                SimpleDateFormat iso = new SimpleDateFormat(f, Locale.getDefault());
+                parsed = iso.parse(rawDate);
+                if (parsed != null) break;
+            } catch (ParseException ignored) {}
+        }
+
+        if (parsed == null) {
+            // fallback : compare brut
+            return rawDate.contains(query);
+        }
+
+        SimpleDateFormat out = new SimpleDateFormat("dd/MM/yyyy", Locale.FRANCE);
+        String formatted = out.format(parsed);
+
+        // L’utilisateur peut taper "01/07" ou "01/07/2025"
+        return formatted.contains(query);
+    }
+
+    /** TextWatcher simplifié */
     private abstract static class SimpleWatcher implements TextWatcher {
         @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
         @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}

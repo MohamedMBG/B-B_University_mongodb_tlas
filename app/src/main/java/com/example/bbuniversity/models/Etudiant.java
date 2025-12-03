@@ -1,59 +1,41 @@
 package com.example.bbuniversity.models;
 
 public class Etudiant extends User {
-    private String matricule;
-    private int niveau;
-    private String filiere;
-    private String classeCode;
-    private String classe;
 
-
-    public Etudiant() {}
-
-    public Etudiant(String uid, String nom, String prenom, String email,
-                    String matricule, int niveau, String filiere, String classeCode) {
-        super(uid, nom, prenom, email, "student");
-        this.matricule = matricule;
-        this.niveau = niveau;
-        this.filiere = filiere;
-        this.classeCode = classeCode;
+    public Etudiant() {
+        // Obligatoire pour Firestore / Gson
     }
 
-    // Getters / Setters
+    public Etudiant(String idOrUid,
+                    String nom,
+                    String prenom,
+                    String email,
+                    int matricule,
+                    int niveau,
+                    String filiere,
+                    String classe,
+                    String codeClasse) {
 
-    public String getMatricule() {
-        return matricule;
+        // On remplit le User (tu peux considérer idOrUid comme _id/uid)
+        set_id(idOrUid);      // si tu utilises _id côté Mongo
+        setUid(idOrUid);      // pour rester compatible avec FirebaseAuth uid
+        setNom(nom);
+        setPrenom(prenom);
+        setEmail(email);
+        setRole("student");
+
+        setMatricule(matricule);
+        setNiveau(niveau);
+        setFiliere(filiere);
+        setClasse(classe);
+        setCodeClasse(codeClasse);
     }
 
-    public void setMatricule(String matricule) {
-        this.matricule = matricule;
-    }
+    // Pas de nouveaux champs ici.
+    // On utilise uniquement les getters/setters hérités de User :
+    //
+    // get_id(), getUid(), getNom(), getPrenom(), getEmail(), getRole()
+    // getMatricule(), getNiveau(), getFiliere(), getClasse(), getCodeClasse()
 
-    public int getNiveau() {
-        return niveau;
-    }
 
-    public void setNiveau(int niveau) {
-        this.niveau = niveau;
-    }
-
-    public String getFiliere() {
-        return filiere;
-    }
-
-    public void setFiliere(String filiere) {
-        this.filiere = filiere;
-    }
-
-    public String getClasseCode() {
-        return classeCode;
-    }
-
-    public String getClasse() {
-        return classe;
-    }
-
-    public void setClasse(String classe) {
-        this.classe = classe;
-    }
 }

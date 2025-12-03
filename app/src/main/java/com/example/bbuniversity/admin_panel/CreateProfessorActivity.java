@@ -2,30 +2,47 @@ package com.example.bbuniversity.admin_panel;
 
 import android.os.Bundle;
 import android.view.View;
-import android.widget.*;
+import android.widget.ArrayAdapter;
+import android.widget.AutoCompleteTextView;
+import android.widget.Button;
+import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+
 import com.example.bbuniversity.R;
+import com.example.bbuniversity.api.ApiClient;
+import com.example.bbuniversity.api.ApiService;
+import com.example.bbuniversity.models.Matiere;
 import com.example.bbuniversity.models.Professeur;
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.firestore.*;
 import com.google.android.material.textfield.TextInputEditText;
-import java.util.*;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FirebaseFirestore;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
 
 public class CreateProfessorActivity extends AppCompatActivity {
 
-    // Champs de saisie
     private TextInputEditText etNom, etPrenom, etEmail, etPassword, etAdresse, etDepartement;
     private AutoCompleteTextView autoMatiere;
     private Button btnCreate, btnCancel, btnAssocierClasses;
     private String teacherId;
 
-
-    // Listes pour toutes les classes Firestore et celles sélectionnées par l'utilisateur
     private final List<String> allClasses = new ArrayList<>();
     private final List<String> selectedClasses = new ArrayList<>();
+
+    private FirebaseAuth auth;
+    private FirebaseFirestore firestore;
+    private ApiService apiService;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -33,9 +50,10 @@ public class CreateProfessorActivity extends AppCompatActivity {
         setContentView(R.layout.activity_create_professor);
         EdgeToEdge.enable(this);
 
-        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+        getWindow().getDecorView().setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
 
-        // Lier les vues avec leurs IDs
+        // Views
         etNom = findViewById(R.id.etNom);
         etPrenom = findViewById(R.id.etPrenom);
         etEmail = findViewById(R.id.etEmail);
@@ -47,67 +65,129 @@ public class CreateProfessorActivity extends AppCompatActivity {
         btnCancel = findViewById(R.id.btnCancel);
         btnAssocierClasses = findViewById(R.id.btnAssocierClasses);
 
-        // Afficher la liste déroulante des matières
-        autoMatiere.setOnClickListener(v -> autoMatiere.showDropDown());
+        auth = FirebaseAuth.getInstance();
+        firestore = FirebaseFirestore.getInstance(); // encore utilisé pour loadTeacherData
+        apiService = ApiClient.getClient().create(ApiService.class);
+
         teacherId = getIntent().getStringExtra("teacherId");
 
-        // Charger les matières depuis Firestore
-        FirebaseFirestore.getInstance().collection("matieres").get()
-                .addOnSuccessListener(snapshot -> {
-                    List<String> matieres = new ArrayList<>();
-                    for (DocumentSnapshot doc : snapshot) {
-                        String nom = doc.getString("nom");
-                        if (nom != null) matieres.add(nom);
-                    }
-                    autoMatiere.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_dropdown_item_1line, matieres));
-                });
+        // 🔹 Charger matières depuis Mongo
+        loadMatieresFromMongo();
 
-        // Boutons
-        btnCreate.setOnClickListener(v -> createProfessor());
+        // 🔹 Charger classes depuis Mongo
+        loadClassesFromMongo();
+
+        autoMatiere.setOnClickListener(v -> autoMatiere.showDropDown());
+
+        btnCancel.setOnClickListener(v -> finish());
+        btnAssocierClasses.setOnClickListener(v -> showClassDialog());
+
         if (teacherId != null) {
+            // mode édition
             etEmail.setEnabled(false);
             etPassword.setVisibility(View.GONE);
             btnCreate.setText("Mettre à jour");
             loadTeacherData();
             btnCreate.setOnClickListener(v -> updateProfessor());
         } else {
+            // création
             btnCreate.setOnClickListener(v -> createProfessor());
         }
-        btnCancel.setOnClickListener(v -> finish());
-        btnAssocierClasses.setOnClickListener(v -> showClassDialog());
     }
 
-    // Affiche une boîte de dialogue pour choisir les classes (depuis Firestore)
+    /** Charge les matières depuis MongoDB via /api/matieres */
+    private void loadMatieresFromMongo() {
+        apiService.getMatieres().enqueue(new Callback<List<Matiere>>() {
+            @Override
+            public void onResponse(Call<List<Matiere>> call, Response<List<Matiere>> response) {
+                if (!response.isSuccessful() || response.body() == null) {
+                    Toast.makeText(CreateProfessorActivity.this,
+                            "Erreur chargement matières (Mongo): code=" + response.code(),
+                            Toast.LENGTH_LONG).show();
+                    return;
+                }
+
+                List<String> matieres = new ArrayList<>();
+                for (Matiere m : response.body()) {
+                    if (m.getNom() != null) {
+                        matieres.add(m.getNom());
+                    }
+                }
+
+                autoMatiere.setAdapter(new ArrayAdapter<>(
+                        CreateProfessorActivity.this,
+                        android.R.layout.simple_dropdown_item_1line,
+                        matieres
+                ));
+            }
+
+            @Override
+            public void onFailure(Call<List<Matiere>> call, Throwable t) {
+                Toast.makeText(CreateProfessorActivity.this,
+                        "Erreur réseau (matieres Mongo): " + t.getMessage(),
+                        Toast.LENGTH_LONG).show();
+            }
+        });
+    }
+
+    /** Charge les classes depuis MongoDB via /api/classes */
+    private void loadClassesFromMongo() {
+        apiService.getClasses().enqueue(new Callback<List<Map<String, Object>>>() {
+            @Override
+            public void onResponse(Call<List<Map<String, Object>>> call,
+                                   Response<List<Map<String, Object>>> response) {
+                if (!response.isSuccessful() || response.body() == null) {
+                    Toast.makeText(CreateProfessorActivity.this,
+                            "Erreur chargement classes (Mongo): code=" + response.code(),
+                            Toast.LENGTH_LONG).show();
+                    return;
+                }
+
+                allClasses.clear();
+                for (Map<String, Object> doc : response.body()) {
+                    // On suppose que chaque doc a un champ "name"
+                    Object nameObj = doc.get("name");
+                    if (nameObj != null) {
+                        allClasses.add(nameObj.toString());
+                    }
+                }
+            }
+
+            @Override
+            public void onFailure(Call<List<Map<String, Object>>> call, Throwable t) {
+                Toast.makeText(CreateProfessorActivity.this,
+                        "Erreur réseau (classes Mongo): " + t.getMessage(),
+                        Toast.LENGTH_LONG).show();
+            }
+        });
+    }
+
+
+    // Dialog choix classes (lecture Firestore)
+    // Dialog choix classes (données déjà chargées depuis Mongo)
     private void showClassDialog() {
-        FirebaseFirestore.getInstance().collection("classes").get()
-                .addOnSuccessListener(snapshot -> {
-                    allClasses.clear();
-                    for (DocumentSnapshot doc : snapshot.getDocuments()) {
-                        String name = doc.getString("name");
-                        if (name != null) allClasses.add(name);
-                    }
+        if (allClasses.isEmpty()) {
+            Toast.makeText(this, "Aucune classe trouvée (Mongo)", Toast.LENGTH_SHORT).show();
+            return;
+        }
 
-                    if (allClasses.isEmpty()) {
-                        Toast.makeText(this, "Aucune classe trouvée", Toast.LENGTH_SHORT).show();
-                        return;
-                    }
+        boolean[] checked = new boolean[allClasses.size()];
+        String[] classesArray = allClasses.toArray(new String[0]);
 
-                    boolean[] checked = new boolean[allClasses.size()];
-                    String[] classesArray = allClasses.toArray(new String[0]);
-
-                    new AlertDialog.Builder(this)
-                            .setTitle("Sélectionner les classes")
-                            .setMultiChoiceItems(classesArray, checked, (dialog, i, isChecked) -> {
-                                String c = classesArray[i];
-                                if (isChecked) selectedClasses.add(c); else selectedClasses.remove(c);
-                            })
-                            .setPositiveButton("OK", null)
-                            .setNegativeButton("Annuler", null)
-                            .show();
-                });
+        new AlertDialog.Builder(this)
+                .setTitle("Sélectionner les classes")
+                .setMultiChoiceItems(classesArray, checked, (dialog, i, isChecked) -> {
+                    String c = classesArray[i];
+                    if (isChecked) selectedClasses.add(c);
+                    else selectedClasses.remove(c);
+                })
+                .setPositiveButton("OK", null)
+                .setNegativeButton("Annuler", null)
+                .show();
     }
 
-    // Crée un compte professeur et l'enregistre dans Firestore
+
+    // 🔹 Création professeur : FirebaseAuth + MongoDB (API)
     private void createProfessor() {
         String nom = etNom.getText().toString().trim();
         String prenom = etPrenom.getText().toString().trim();
@@ -122,26 +202,60 @@ public class CreateProfessorActivity extends AppCompatActivity {
             return;
         }
 
-        FirebaseAuth.getInstance().createUserWithEmailAndPassword(email, pass)
-                .addOnSuccessListener(auth -> {
-                    String uid = auth.getUser().getUid();
+        auth.createUserWithEmailAndPassword(email, pass)
+                .addOnSuccessListener(authResult -> {
+                    String uid = authResult.getUser().getUid();
+
                     Map<String, List<String>> enseignement = new HashMap<>();
-                    enseignement.put(matiere, new ArrayList<>(selectedClasses)); // matière → classes
+                    if (!matiere.isEmpty()) {
+                        enseignement.put(matiere, new ArrayList<>(selectedClasses));
+                    }
 
-                    //appeler le constrcuteur professeur
-                    Professeur prof = new Professeur(uid, nom, prenom, email, "professor", dep, adresse, enseignement);
+                    Map<String, Object> profData = new HashMap<>();
+                    profData.put("_id", uid);
+                    profData.put("uid", uid);
+                    profData.put("nom", nom);
+                    profData.put("prenom", prenom);
+                    profData.put("email", email);
+                    profData.put("adresse", adresse);
+                    profData.put("departement", dep);
+                    profData.put("role", "professor");
+                    profData.put("enseignement", enseignement);
 
-                    //specification d'url d'enregistrement
-                    FirebaseFirestore.getInstance().collection("users").document(uid).set(prof)
-                            .addOnSuccessListener(r -> {
-                                Toast.makeText(this, "Professeur créé avec succès", Toast.LENGTH_SHORT).show();
+                    apiService.createUser(profData).enqueue(new Callback<Void>() {
+                        @Override
+                        public void onResponse(Call<Void> call, Response<Void> response) {
+                            if (response.isSuccessful()) {
+                                Toast.makeText(CreateProfessorActivity.this,
+                                        "Professeur créé avec succès", Toast.LENGTH_SHORT).show();
                                 finish();
-                            })
-                            .addOnFailureListener(e -> Toast.makeText(this, "Erreur Firestore", Toast.LENGTH_SHORT).show());
+                            } else {
+                                String err = "code=" + response.code();
+                                try {
+                                    if (response.errorBody() != null) {
+                                        err += " body=" + response.errorBody().string();
+                                    }
+                                } catch (Exception ignored) {}
+                                Toast.makeText(CreateProfessorActivity.this,
+                                        "Erreur API (Mongo): " + err,
+                                        Toast.LENGTH_LONG).show();
+                            }
+                        }
+
+                        @Override
+                        public void onFailure(Call<Void> call, Throwable t) {
+                            Toast.makeText(CreateProfessorActivity.this,
+                                    "Erreur réseau: " + t.getMessage(),
+                                    Toast.LENGTH_LONG).show();
+                        }
+                    });
                 })
-                .addOnFailureListener(e -> Toast.makeText(this, "Erreur Auth", Toast.LENGTH_SHORT).show());
+                .addOnFailureListener(e ->
+                        Toast.makeText(this, "Erreur Auth: " + e.getMessage(), Toast.LENGTH_SHORT).show());
     }
+
     private void loadTeacherData() {
+        // Pour l’instant on laisse Firestore pour le chargement
         FirebaseFirestore.getInstance().collection("users").document(teacherId)
                 .get()
                 .addOnSuccessListener(doc -> {
@@ -157,6 +271,7 @@ public class CreateProfessorActivity extends AppCompatActivity {
                     }
                 });
     }
+
     private void updateProfessor() {
         String nom = etNom.getText().toString().trim();
         String prenom = etPrenom.getText().toString().trim();
@@ -169,18 +284,39 @@ public class CreateProfessorActivity extends AppCompatActivity {
         updates.put("prenom", prenom);
         updates.put("adresse", adresse);
         updates.put("departement", dep);
+
         if (!matiere.isEmpty()) {
             Map<String, List<String>> enseignement = new HashMap<>();
             enseignement.put(matiere, new ArrayList<>(selectedClasses));
             updates.put("enseignement", enseignement);
         }
 
-        FirebaseFirestore.getInstance().collection("users").document(teacherId)
-                .update(updates)
-                .addOnSuccessListener(r -> {
-                    Toast.makeText(this, "Professeur mis \u00E0 jour", Toast.LENGTH_SHORT).show();
+        apiService.updateUser(teacherId, updates).enqueue(new Callback<Void>() {
+            @Override
+            public void onResponse(Call<Void> call, Response<Void> response) {
+                if (response.isSuccessful()) {
+                    Toast.makeText(CreateProfessorActivity.this,
+                            "Professeur mis à jour", Toast.LENGTH_SHORT).show();
                     finish();
-                })
-                .addOnFailureListener(e -> Toast.makeText(this, "Erreur Firestore", Toast.LENGTH_SHORT).show());
+                } else {
+                    String err = "code=" + response.code();
+                    try {
+                        if (response.errorBody() != null) {
+                            err += " body=" + response.errorBody().string();
+                        }
+                    } catch (Exception ignored) {}
+                    Toast.makeText(CreateProfessorActivity.this,
+                            "Erreur API (Mongo): " + err,
+                            Toast.LENGTH_LONG).show();
+                }
+            }
+
+            @Override
+            public void onFailure(Call<Void> call, Throwable t) {
+                Toast.makeText(CreateProfessorActivity.this,
+                        "Erreur réseau: " + t.getMessage(),
+                        Toast.LENGTH_LONG).show();
+            }
+        });
     }
 }

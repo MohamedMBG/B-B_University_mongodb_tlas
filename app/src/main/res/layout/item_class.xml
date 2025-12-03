@@ -1,31 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-
-    android:layout_margin="8dp"
-    app:cardCornerRadius="8dp"
+    android:layout_margin="5dp"
+    android:layout_marginBottom="12dp"
+    android:foreground="?attr/selectableItemBackground"
+    app:cardBackgroundColor="@android:color/white"
+    app:cardCornerRadius="12dp"
     app:cardElevation="2dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="16dp">
+        android:padding="20dp">
 
         <TextView
             android:id="@+id/tvClassName"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textStyle="bold"
-            android:text="Class" />
+            android:fontFamily="sans-serif-medium"
+            android:textColor="#1F2937"
+            android:textSize="18sp"
+            tools:text="Grade 10 - Mathematics" />
 
         <TextView
             android:id="@+id/tvSubject"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:text="Subject" />
+            android:fontFamily="sans-serif"
+            android:textColor="#6B7280"
+            android:textSize="14sp"
+            tools:text="Algebra and Geometry" />
+
     </LinearLayout>
 </androidx.cardview.widget.CardView>

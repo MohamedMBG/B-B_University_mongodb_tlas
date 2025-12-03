@@ -1,59 +1,40 @@
 package com.example.bbuniversity.models;
-import com.google.firebase.Timestamp;
 
-
-import com.google.firebase.Timestamp;
-import com.google.firebase.firestore.Exclude;
-import com.google.firebase.firestore.IgnoreExtraProperties;
-
-@IgnoreExtraProperties
 public class Complaint {
-    private String studentId;        // UID of the student who filed
-    private String teacherId;        // UID of the teacher handling it
-    private String subjectId;        // e.g. "math_101" or course code
-    private String noteId;           // document path or ID of the grade entry
-    private double initialGrade;        // the original grade
-    private double modifiedGrade;       // grade after teacher’s decision
-    private String title;            // objet / subject of the complaint
-    private String description;      // detailed message from the student
-    private String response;         // teacher’s response text
-    private String status;           // e.g. "pending", "accepted", "rejected"
-    private Timestamp dateFiled;     // when the complaint was submitted
-    private Timestamp dateProcessed; // when teacher accepted/rejected
-    @Exclude
+
+    private String _id;           // id MongoDB (ObjectId en string)
+    private String studentId;     // uid Firebase ou id Mongo
+    private String teacherId;     // uid prof
+    private String subjectId;     // ex: "MATH_101"
+    private String noteId;        // id de la note concernée
+
+    private String title;         // "Réclamation sur la note"
+    private String description;   // message de l'étudiant
+
+    private double initialGrade;  // note avant réclamation
+    private Double modifiedGrade; // note après traitement (nullable)
+
+    private String status;        // "pending", "accepted", "rejected"
+    private String response;      // réponse du prof
+
+    private String dateFiled;     // String ISO venant du backend
+    private String dateProcessed; // idem
+
+    // Optionnel : pratique pour Firestore ou adapter
     private String documentPath;
 
-    // Mandatory public no-arg constructor for Firestore
-    public Complaint() {}
-
-    public Complaint(String studentId,
-                     String teacherId,
-                     String subjectId,
-                     String noteId,
-                     double initialGrade,
-                     double modifiedGrade,
-                     String title,
-                     String description,
-                     String response,
-                     String status,
-                     Timestamp dateFiled,
-                     Timestamp dateProcessed) {
-        this.studentId       = studentId;
-        this.teacherId       = teacherId;
-        this.subjectId       = subjectId;
-        this.noteId          = noteId;
-        this.initialGrade    = initialGrade;
-        this.modifiedGrade   = modifiedGrade;
-        this.title           = title;
-        this.description     = description;
-        this.response        = response;
-        this.status          = status;
-        this.dateFiled       = dateFiled;
-        this.dateProcessed   = dateProcessed;
-
+    public Complaint() {
+        // requis pour Gson / Firestore
     }
 
-    // ────────────── Getters & Setters ──────────────
+    // ---------- GETTERS / SETTERS ----------
+
+    public String getId() {
+        return _id;
+    }
+    public void setId(String id) {
+        this._id = id;
+    }
 
     public String getStudentId() {
         return studentId;
@@ -83,20 +64,6 @@ public class Complaint {
         this.noteId = noteId;
     }
 
-    public double getInitialGrade() {
-        return initialGrade;
-    }
-    public void setInitialGrade(int initialGrade) {
-        this.initialGrade = initialGrade;
-    }
-
-    public double getModifiedGrade() {
-        return modifiedGrade;
-    }
-    public void setModifiedGrade(int modifiedGrade) {
-        this.modifiedGrade = modifiedGrade;
-    }
-
     public String getTitle() {
         return title;
     }
@@ -111,11 +78,18 @@ public class Complaint {
         this.description = description;
     }
 
-    public String getResponse() {
-        return response;
+    public double getInitialGrade() {
+        return initialGrade;
     }
-    public void setResponse(String response) {
-        this.response = response;
+    public void setInitialGrade(double initialGrade) {
+        this.initialGrade = initialGrade;
+    }
+
+    public Double getModifiedGrade() {
+        return modifiedGrade;
+    }
+    public void setModifiedGrade(Double modifiedGrade) {
+        this.modifiedGrade = modifiedGrade;
     }
 
     public String getStatus() {
@@ -125,25 +99,30 @@ public class Complaint {
         this.status = status;
     }
 
-    public Timestamp getDateFiled() {
+    public String getResponse() {
+        return response;
+    }
+    public void setResponse(String response) {
+        this.response = response;
+    }
+
+    public String getDateFiled() {
         return dateFiled;
     }
-    public void setDateFiled(Timestamp dateFiled) {
+    public void setDateFiled(String dateFiled) {
         this.dateFiled = dateFiled;
     }
 
-    public Timestamp getDateProcessed() {
+    public String getDateProcessed() {
         return dateProcessed;
     }
-    public void setDateProcessed(Timestamp dateProcessed) {
+    public void setDateProcessed(String dateProcessed) {
         this.dateProcessed = dateProcessed;
     }
-    @Exclude
+
     public String getDocumentPath() {
         return documentPath;
     }
-
-    @Exclude
     public void setDocumentPath(String documentPath) {
         this.documentPath = documentPath;
     }

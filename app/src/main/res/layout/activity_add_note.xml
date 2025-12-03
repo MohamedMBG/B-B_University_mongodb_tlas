@@ -5,6 +5,8 @@
     android:layout_height="match_parent"
     android:background="@color/white"
     android:fillViewport="true"
+    android:scrollbars="none"
+    android:clipToPadding="false"
     android:isScrollContainer="true">
 
     <LinearLayout
@@ -12,77 +14,79 @@
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:gravity="center_horizontal"
-        android:layout_marginTop="10dp"
-        android:layout_marginEnd="10dp"
-        android:layout_marginStart="10dp"
-        android:paddingBottom="24dp">
+        android:paddingBottom="40dp">
 
-        <!-- Header -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="25dp"
+            android:layout_marginTop="40dp"
             android:orientation="vertical"
             android:gravity="center"
-            android:layout_marginBottom="24dp">
+            android:layout_marginBottom="32dp">
 
             <ImageView
-                android:layout_width="56dp"
-                android:layout_height="56dp"
+                android:layout_width="72dp"
+                android:layout_height="72dp"
                 android:src="@drawable/ic_note_add"
                 android:background="@drawable/circle_background_gold"
-                android:padding="10dp"
+                android:padding="16dp"
                 app:tint="@color/primary_dark"
-                android:layout_marginBottom="8dp" />
+                android:layout_marginBottom="16dp"
+                android:elevation="4dp"/>
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Ajouter une Note"
-                android:textSize="22sp"
+                android:textSize="26sp"
                 android:textColor="@color/black"
-                android:fontFamily="@font/montserrat_bold" />
+                android:fontFamily="@font/montserrat_bold"
+                android:layout_marginBottom="4dp"/>
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Enregistrez les notes d'un étudiant"
                 android:textSize="14sp"
+                android:alpha="0.7"
                 android:textColor="@color/success_color"/>
         </LinearLayout>
 
-        <!-- Card with Inputs -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginHorizontal="8dp"
-            app:cardElevation="8dp"
-            app:cardCornerRadius="16dp"
+            android:layout_marginHorizontal="16dp"
+            app:cardElevation="0dp"
+            app:strokeWidth="1dp"
+            app:strokeColor="#E0E0E0"
+            app:cardCornerRadius="24dp"
             app:cardBackgroundColor="@color/card_background">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="20dp">
+                android:padding="24dp">
 
-                <!-- Student Info -->
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="Informations de l'étudiant"
                     android:textColor="@color/text_primary"
                     android:textStyle="bold"
-                    android:textSize="16sp"
-                    android:layout_marginBottom="16dp"
+                    android:textSize="18sp"
+                    android:layout_marginBottom="20dp"
                     android:fontFamily="@font/montserrat_bold" />
 
-                <!-- Email -->
                 <com.google.android.material.textfield.TextInputLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:hint="Email de l'étudiant"
                     style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                    app:boxCornerRadiusTopStart="12dp"
+                    app:boxCornerRadiusTopEnd="12dp"
+                    app:boxCornerRadiusBottomStart="12dp"
+                    app:boxCornerRadiusBottomEnd="12dp"
                     app:startIconDrawable="@drawable/ic_email"
                     app:startIconTint="@color/primary_medium"
                     app:boxStrokeColor="@color/primary_medium"
@@ -91,20 +95,24 @@
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/etStudentEmail"
                         android:layout_width="match_parent"
-                        android:layout_height="56dp"
+                        android:layout_height="wrap_content"
+                        android:paddingVertical="16dp"
                         android:maxLines="1"
                         android:singleLine="true"
                         android:inputType="textEmailAddress"
                         android:textColor="@color/text_primary" />
                 </com.google.android.material.textfield.TextInputLayout>
 
-                <!-- Matière -->
                 <com.google.android.material.textfield.TextInputLayout
-                    android:layout_marginTop="12dp"
+                    android:layout_marginTop="16dp"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:hint="Matière (ex: MATH_101)"
                     style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                    app:boxCornerRadiusTopStart="12dp"
+                    app:boxCornerRadiusTopEnd="12dp"
+                    app:boxCornerRadiusBottomStart="12dp"
+                    app:boxCornerRadiusBottomEnd="12dp"
                     app:startIconDrawable="@drawable/ic_book"
                     app:startIconTint="@color/primary_medium"
                     app:boxStrokeColor="@color/primary_medium"
@@ -113,31 +121,30 @@
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/etMatiere"
                         android:layout_width="match_parent"
-                        android:layout_height="56dp"
+                        android:layout_height="wrap_content"
+                        android:paddingVertical="16dp"
                         android:maxLines="1"
                         android:singleLine="true"
                         android:textColor="@color/text_primary" />
                 </com.google.android.material.textfield.TextInputLayout>
 
-                <!-- Divider -->
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
-                    android:layout_marginVertical="20dp"
-                    android:background="@color/divider_color" />
+                    android:layout_marginVertical="24dp"
+                    android:background="@color/divider_color"
+                    android:alpha="0.5"/>
 
-                <!-- Grades Info -->
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="Notes d'évaluation"
                     android:textColor="@color/text_primary"
                     android:textStyle="bold"
-                    android:textSize="16sp"
+                    android:textSize="18sp"
                     android:fontFamily="@font/montserrat_bold"
-                    android:layout_marginBottom="16dp" />
+                    android:layout_marginBottom="20dp" />
 
-                <!-- Contrôle & Examen -->
                 <LinearLayout
                     android:orientation="horizontal"
                     android:layout_width="match_parent"
@@ -151,6 +158,10 @@
                         android:hint="Contrôle"
                         app:hintTextColor="@color/accent_gold_dark"
                         style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                        app:boxCornerRadiusTopStart="12dp"
+                        app:boxCornerRadiusTopEnd="12dp"
+                        app:boxCornerRadiusBottomStart="12dp"
+                        app:boxCornerRadiusBottomEnd="12dp"
                         app:boxStrokeColor="@color/accent_gold_dark"
                         app:startIconDrawable="@drawable/ic_quiz"
                         app:startIconTint="@color/accent_gold_dark"
@@ -160,7 +171,8 @@
                         <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/etControle"
                             android:layout_width="match_parent"
-                            android:layout_height="56dp"
+                            android:layout_height="wrap_content"
+                            android:paddingVertical="16dp"
                             android:maxLines="1"
                             android:singleLine="true"
                             android:inputType="numberDecimal"
@@ -176,6 +188,10 @@
                         android:hint="Examen"
                         app:hintTextColor="@color/accent_gold_dark"
                         style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                        app:boxCornerRadiusTopStart="12dp"
+                        app:boxCornerRadiusTopEnd="12dp"
+                        app:boxCornerRadiusBottomStart="12dp"
+                        app:boxCornerRadiusBottomEnd="12dp"
                         app:boxStrokeColor="@color/accent_gold_dark"
                         app:startIconDrawable="@drawable/ic_assignment"
                         app:startIconTint="@color/accent_gold_dark"
@@ -185,7 +201,8 @@
                         <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/etExamen"
                             android:layout_width="match_parent"
-                            android:layout_height="56dp"
+                            android:layout_height="wrap_content"
+                            android:paddingVertical="16dp"
                             android:maxLines="1"
                             android:singleLine="true"
                             android:inputType="numberDecimal"
@@ -194,14 +211,17 @@
                     </com.google.android.material.textfield.TextInputLayout>
                 </LinearLayout>
 
-                <!-- Participation -->
                 <com.google.android.material.textfield.TextInputLayout
-                    android:layout_marginTop="12dp"
+                    android:layout_marginTop="16dp"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:hint="Participation"
                     app:hintTextColor="@color/accent_gold_dark"
                     style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                    app:boxCornerRadiusTopStart="12dp"
+                    app:boxCornerRadiusTopEnd="12dp"
+                    app:boxCornerRadiusBottomStart="12dp"
+                    app:boxCornerRadiusBottomEnd="12dp"
                     app:boxStrokeColor="@color/accent_gold_dark"
                     app:startIconDrawable="@drawable/ic_people"
                     app:startIconTint="@color/accent_gold_dark"
@@ -211,7 +231,8 @@
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/etParticipation"
                         android:layout_width="match_parent"
-                        android:layout_height="56dp"
+                        android:layout_height="wrap_content"
+                        android:paddingVertical="16dp"
                         android:maxLines="1"
                         android:singleLine="true"
                         android:inputType="numberDecimal"
@@ -219,12 +240,12 @@
                         android:textColor="@color/text_primary" />
                 </com.google.android.material.textfield.TextInputLayout>
 
-                <!-- Grade Preview -->
                 <com.google.android.material.card.MaterialCardView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
-                    app:cardCornerRadius="8dp"
+                    android:layout_marginTop="24dp"
+                    app:cardCornerRadius="12dp"
+                    app:cardElevation="0dp"
                     app:cardBackgroundColor="@color/info_background"
                     app:strokeWidth="1dp"
                     app:strokeColor="@color/info_border">
@@ -233,22 +254,23 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
-                        android:padding="12dp"
+                        android:padding="16dp"
                         android:gravity="center_vertical">
 
                         <ImageView
-                            android:layout_width="20dp"
-                            android:layout_height="20dp"
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
                             android:src="@drawable/ic_calculate"
-                            android:layout_marginEnd="8dp"
+                            android:layout_marginEnd="12dp"
                             app:tint="@color/info_color" />
 
                         <TextView
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:text="Moyenne calculée automatiquement"
-                            android:textSize="12sp"
+                            android:text="Moyenne calculée"
+                            android:textSize="14sp"
+                            android:textStyle="bold"
                             android:textColor="@color/info_color"/>
 
                         <TextView
@@ -256,39 +278,43 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="--/20"
-                            android:textSize="14sp"
+                            android:textSize="18sp"
                             android:textStyle="bold"
                             android:textColor="@color/info_color"/>
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
-                <!-- Submit Buttons -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:gravity="end"
-                    android:layout_marginTop="24dp">
+                    android:layout_marginTop="32dp">
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnAddNote"
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
+                        android:layout_height="60dp"
                         android:text="Ajouter la Note"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:layout_marginBottom="12dp"
                         android:backgroundTint="@color/success_color"
                         android:textColor="@android:color/white"
                         app:icon="@drawable/ic_check"
                         app:iconTint="@android:color/white"
-                        app:cornerRadius="12dp"/>
+                        app:cornerRadius="12dp"
+                        android:elevation="2dp"/>
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnCancel"
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
+                        android:layout_height="60dp"
                         android:text="Annuler"
-                        android:layout_marginEnd="12dp"
+                        android:textSize="16sp"
                         style="@style/Widget.Material3.Button.OutlinedButton"
                         app:strokeColor="@color/error_color"
+                        app:strokeWidth="1dp"
+                        app:cornerRadius="12dp"
                         android:textColor="@color/error_color"/>
                 </LinearLayout>
             </LinearLayout>

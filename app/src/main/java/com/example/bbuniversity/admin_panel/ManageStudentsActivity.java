@@ -4,7 +4,6 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
-import android.util.Log;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.Toast;
@@ -13,19 +12,24 @@ import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+
 import com.example.bbuniversity.R;
 import com.example.bbuniversity.adapters.StudentAdapter;
+import com.example.bbuniversity.api.ApiClient;
+import com.example.bbuniversity.api.ApiService;
 import com.example.bbuniversity.models.Etudiant;
-import com.google.android.material.floatingactionbutton.FloatingActionButton;
-import com.google.android.material.textfield.TextInputEditText;
-import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.QueryDocumentSnapshot;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
-public class ManageStudentsActivity extends AppCompatActivity implements StudentAdapter.OnStudentClickListener {
+import com.google.android.material.textfield.TextInputEditText;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+
+public class ManageStudentsActivity extends AppCompatActivity
+        implements StudentAdapter.OnStudentClickListener {
 
     private RecyclerView recyclerView;
     private StudentAdapter adapter;
@@ -33,29 +37,26 @@ public class ManageStudentsActivity extends AppCompatActivity implements Student
     private List<Etudiant> filteredList = new ArrayList<>();
     private TextInputEditText searchInput;
     private ImageView fabBack;
-    private FirebaseFirestore db;
+
+    // --- API Mongo ---
+    private ApiService apiService;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         EdgeToEdge.enable(this);
-
         setContentView(R.layout.activity_manage_students);
 
         getWindow().getDecorView().setSystemUiVisibility(
                 View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
         );
 
-        try {
-            db = FirebaseFirestore.getInstance();
-            initializeViews();
-            setupRecyclerView();
-            loadStudents();
-            setupSearch();
-        } catch (Exception e) {
-            Toast.makeText(this, "Initialization error: " + e.getMessage(), Toast.LENGTH_LONG).show();
-            finish();
-        }
+        apiService = ApiClient.getClient().create(ApiService.class);
+
+        initializeViews();
+        setupRecyclerView();
+        setupSearch();
+        loadStudentsFromMongo();
     }
 
     private void initializeViews() {
@@ -71,59 +72,36 @@ public class ManageStudentsActivity extends AppCompatActivity implements Student
         recyclerView.setAdapter(adapter);
     }
 
-    private void loadStudents() {
-        db.collection("users")
-                .whereEqualTo("role", "student")
-                .get()
-                .addOnCompleteListener(task -> {
-                    if (task.isSuccessful() && task.getResult() != null) {
-                        studentList.clear();
-                        for (QueryDocumentSnapshot doc : task.getResult()) {
-                            try {
-                                // Convert Firestore document to a Map
-                                Map<String, Object> data = new HashMap<>(doc.getData());
+    // ----------------------------
+    //  CHARGEMENT DEPUIS MONGO
+    // ----------------------------
+    private void loadStudentsFromMongo() {
+        apiService.getStudents().enqueue(new Callback<List<Etudiant>>() {
+            @Override
+            public void onResponse(Call<List<Etudiant>> call,
+                                   Response<List<Etudiant>> response) {
 
-                                // Fix: Convert 'matricule' from Long to String if needed
-                                if (data.get("matricule") instanceof Long) {
-                                    data.put("matricule", String.valueOf(data.get("matricule")));
-                                }
+                if (!response.isSuccessful() || response.body() == null) {
+                    Toast.makeText(ManageStudentsActivity.this,
+                            "Erreur chargement étudiants : code=" + response.code(),
+                            Toast.LENGTH_LONG).show();
+                    return;
+                }
 
-                                // Get codeClasse if exists, otherwise generate it from components
-                                String codeClasse = data.containsKey("codeClasse") ?
-                                        (String) data.get("codeClasse") :
-                                        generateCodeClasse(
-                                                ((Number) data.getOrDefault("niveau", 0)).intValue(),
-                                                (String) data.getOrDefault("filiere", ""),
-                                                (String) data.getOrDefault("classe", "")
-                                        );
+                studentList.clear();
+                studentList.addAll(response.body());
+                updateFilteredList("");
+            }
 
-                                // Manually create Etudiant object
-                                Etudiant student = new Etudiant(
-                                        doc.getId(),
-                                        (String) data.get("nom"),
-                                        (String) data.get("prenom"),
-                                        (String) data.get("email"),
-                                        (String) data.get("matricule"),  // Now ensured to be String
-                                        ((Number) data.getOrDefault("niveau", 0)).intValue(),  // Handle Number -> int
-                                        (String) data.get("filiere"),
-                                        codeClasse  // Using codeClasse instead of classe
-                                );
-
-                                studentList.add(student);
-                            } catch (Exception e) {
-                                Log.e("DeserializationError", "Error processing student: " + e.getMessage());
-                            }
-                        }
-                        updateFilteredList("");
-                    } else {
-                        Toast.makeText(this, "Error loading students", Toast.LENGTH_SHORT).show();
-                    }
-                });
+            @Override
+            public void onFailure(Call<List<Etudiant>> call, Throwable t) {
+                Toast.makeText(ManageStudentsActivity.this,
+                        "Erreur réseau étudiants : " + t.getMessage(),
+                        Toast.LENGTH_LONG).show();
+            }
+        });
     }
 
-    private String generateCodeClasse(int niveau, String filiere, String classe) {
-        return niveau + filiere + classe;
-    }
 
     private void setupSearch() {
         searchInput.addTextChangedListener(new TextWatcher() {
@@ -138,58 +116,78 @@ public class ManageStudentsActivity extends AppCompatActivity implements Student
     }
 
     private void updateFilteredList(String query) {
-        try {
-            filteredList.clear();
+        filteredList.clear();
 
-            if (query == null || query.isEmpty()) {
-                filteredList.addAll(studentList);
-            } else {
-                String lowerCaseQuery = query.toLowerCase();
-                for (Etudiant student : studentList) {
-                    if (student != null && matchesQuery(student, lowerCaseQuery)) {
-                        filteredList.add(student);
-                    }
+        if (query == null || query.isEmpty()) {
+            filteredList.addAll(studentList);
+        } else {
+            String lower = query.toLowerCase();
+            for (Etudiant student : studentList) {
+                if (student != null && matchesQuery(student, lower)) {
+                    filteredList.add(student);
                 }
             }
-            adapter.notifyDataSetChanged();
-        } catch (Exception e) {
-            Toast.makeText(this, "Error filtering students: " + e.getMessage(),
-                    Toast.LENGTH_SHORT).show();
         }
+        adapter.notifyDataSetChanged();
     }
 
-    private boolean matchesQuery(Etudiant student, String lowerCaseQuery) {
-        return (student.getNom() != null && student.getNom().toLowerCase().contains(lowerCaseQuery)) ||
-                (student.getPrenom() != null && student.getPrenom().toLowerCase().contains(lowerCaseQuery)) ||
-                (student.getEmail() != null && student.getEmail().toLowerCase().contains(lowerCaseQuery)) ||
-                (student.getMatricule() != null && student.getMatricule().toLowerCase().contains(lowerCaseQuery)) ||
-                (student.getClasseCode() != null && student.getClasseCode().toLowerCase().contains(lowerCaseQuery)) ||
-                (student.getFiliere() != null && student.getFiliere().toLowerCase().contains(lowerCaseQuery));
+    private boolean matchesQuery(Etudiant student, String q) {
+        // Nom + prénom
+        if (student.getNom() != null &&
+                student.getNom().toLowerCase().contains(q)) return true;
+
+        if (student.getPrenom() != null &&
+                student.getPrenom().toLowerCase().contains(q)) return true;
+
+        // Email
+        if (student.getEmail() != null &&
+                student.getEmail().toLowerCase().contains(q)) return true;
+
+        // Matricule (int → String)
+        int matricule = student.getMatricule();
+        if (matricule > 0 &&
+                String.valueOf(matricule).contains(q)) return true;
+
+        // Code classe ou classe
+        String codeClasse = student.getCodeClasse();
+        if (codeClasse != null &&
+                codeClasse.toLowerCase().contains(q)) return true;
+
+        String classe = student.getClasse();
+        if (classe != null &&
+                classe.toLowerCase().contains(q)) return true;
+
+        // Filière
+        if (student.getFiliere() != null &&
+                student.getFiliere().toLowerCase().contains(q)) return true;
+
+        return false;
     }
 
+    // ----------------------------
+    //  CLICS SUR UN ÉTUDIANT
+    // ----------------------------
     @Override
     public void onStudentClick(Etudiant student) {
         try {
             if (student != null && student.getUid() != null) {
                 Intent intent = new Intent(this, EditStudentDetailsActivity.class);
-                intent.putExtra("studentId", student.getUid());
+                intent.putExtra("studentId", student.getUid());  // toujours uid comme clé
                 startActivity(intent);
             }
         } catch (Exception e) {
-            Toast.makeText(this, "Error opening student details: " + e.getMessage(),
+            Toast.makeText(this,
+                    "Error opening student details: " + e.getMessage(),
                     Toast.LENGTH_SHORT).show();
         }
     }
 
     @Override
     public void onStudentLongClick(Etudiant student, View view) {
-        try {
-            if (student != null && student.getPrenom() != null) {
-                Toast.makeText(this, "Long pressed: " + student.getPrenom(),
-                        Toast.LENGTH_SHORT).show();
-            }
-        } catch (Exception e) {
-            // Silent fail for long press
+        if (student != null && student.getPrenom() != null) {
+            Toast.makeText(this,
+                    "Long pressed: " + student.getPrenom(),
+                    Toast.LENGTH_SHORT).show();
         }
     }
 }

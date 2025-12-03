@@ -1,29 +1,51 @@
 package com.example.bbuniversity.models;
 
-import java.util.Date;
-
 public class Abscence {
-    private String documentId;
+
+    // correspond à _id dans Mongo
+    private String _id;
+
+    // UID Firebase de l'étudiant (ce qu’on met dans studentId dans l’URL)
+    private String studentUserId;
+
+    // Email de l’étudiant (facultatif mais utile)
+    private String studentEmail;
+
+    // Nom de la matière (ce que l’admin choisit dans etMatiere)
     private String matiere;
-    private Date date;
+
+    // Date au format texte (on renverra un string ISO côté API)
+    private String date;
+
+    // Absence justifiée ou non
     private boolean justifiee;
 
     public Abscence() {}
 
-    public Abscence(String matiere, Date date, boolean justifiee) {
-        this.matiere = matiere;
-        this.date = date;
-        this.justifiee = justifiee;
+    // -------- GETTERS / SETTERS --------
+
+    public String getId() {
+        return _id;
     }
 
-    // Getters & Setters
-
-    public String getDocumentId() {
-        return documentId;
+    public void setId(String id) {
+        this._id = id;
     }
 
-    public void setDocumentId(String documentId) {
-        this.documentId = documentId;
+    public String getStudentUserId() {
+        return studentUserId;
+    }
+
+    public void setStudentUserId(String studentUserId) {
+        this.studentUserId = studentUserId;
+    }
+
+    public String getStudentEmail() {
+        return studentEmail;
+    }
+
+    public void setStudentEmail(String studentEmail) {
+        this.studentEmail = studentEmail;
     }
 
     public String getMatiere() {
@@ -34,11 +56,11 @@ public class Abscence {
         this.matiere = matiere;
     }
 
-    public Date getDate() {
+    public String getDate() {
         return date;
     }
 
-    public void setDate(Date date) {
+    public void setDate(String date) {
         this.date = date;
     }
 

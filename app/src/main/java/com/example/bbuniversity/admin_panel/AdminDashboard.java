@@ -14,9 +14,13 @@ import androidx.cardview.widget.CardView;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.example.bbuniversity.MainActivity;
 import com.example.bbuniversity.R;
 import com.example.bbuniversity.adapters.NoteAdapter;
+import com.example.bbuniversity.api.ApiClient;
+import com.example.bbuniversity.api.ApiService;
 import com.example.bbuniversity.etudiant.StudentActivity;
+import com.example.bbuniversity.models.DashboardResponse;
 import com.example.bbuniversity.models.Note;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.firebase.auth.FirebaseAuth;
@@ -28,12 +32,17 @@ import com.google.firebase.firestore.QueryDocumentSnapshot;
 import java.util.ArrayList;
 import java.util.List;
 
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+
 public class AdminDashboard extends AppCompatActivity {
 
-    private FirebaseFirestore db;
     private NoteAdapter noteAdapter;
     private TextView textTotalStudents, textTotalTeachers, textTotalAbsences;
-    private CardView manageTeachers,manageStudents;
+    private CardView manageTeachers, manageStudents;
+    private ApiService apiService;
+
 
     @SuppressLint("MissingInflatedId")
     @Override
@@ -46,28 +55,24 @@ public class AdminDashboard extends AppCompatActivity {
                 View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
         );
 
-        db = FirebaseFirestore.getInstance();
+        apiService = ApiClient.getClient().create(ApiService.class);
+
+        findViewById(R.id.btnLogout).setOnClickListener(v -> {
+            FirebaseAuth.getInstance().signOut();
+
+            Intent i = new Intent(AdminDashboard.this, MainActivity.class);
+            i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            startActivity(i);
+        });
+
 
         setupUI();
         setupButtons();
-        loadDashboardData();
-        logout();
-    }
-    private void loadTotalAbsences() {
-        db.collectionGroup("abscence").get()
-                .addOnCompleteListener(task -> {
-                    if (task.isSuccessful()) {
-                        textTotalAbsences.setText(String.valueOf(task.getResult().size()));
-                    } else {
-                        textTotalAbsences.setText("Error");
-                        Log.e("AbsenceCount", "Error", task.getException());
-                    }
-                });
     }
     private void setupUI() {
         RecyclerView recyclerViewNotes = findViewById(R.id.recyclerViewNotes);
         recyclerViewNotes.setLayoutManager(new LinearLayoutManager(this));
-        noteAdapter = new NoteAdapter(new ArrayList<>(), db);
+        noteAdapter = new NoteAdapter(new ArrayList<>());
         recyclerViewNotes.setAdapter(noteAdapter);
 
         textTotalStudents = findViewById(R.id.textTotalStudents);
@@ -96,89 +101,46 @@ public class AdminDashboard extends AppCompatActivity {
         startActivity(new Intent(this, cls));
     }
 
-    private void loadDashboardData() {
-        loadNotes();
-        loadAbsenceStats();
-        loadCount("student", R.id.textTotalStudents);
-        loadCount("professor", R.id.textTotalTeachers);
-        loadTotalAbsences();
 
-    }
 
-    private void loadCount(String role, int textViewId) {
-        db.collection("users").whereEqualTo("role", role).get()
-                .addOnCompleteListener(task -> {
-                    TextView textView = findViewById(textViewId);
-                    if (task.isSuccessful()) {
-                        textView.setText(String.valueOf(task.getResult().size()));
-                    } else {
-                        textView.setText("Error");
-                        Log.e(role + "Count", "Error", task.getException());
-                    }
-                });
-    }
 
-    private void loadNotes() {
-        db.collectionGroup("notes")
-                .orderBy("derniereMiseAJour", Query.Direction.DESCENDING)
-                .limit(3).get()
-                .addOnCompleteListener(task -> {
-                    if (task.isSuccessful()) {
-                        List<Note> notes = new ArrayList<>();
-                        for (QueryDocumentSnapshot doc : task.getResult()) {
-                            try {
-                                notes.add(doc.toObject(Note.class));
-                            } catch (Exception e) {
-                                Log.e("NoteParseError", "Error", e);
-                            }
-                        }
-                        noteAdapter.mettreAJourListe(notes);
-                    } else {
-                        handleFirestoreError(task.getException(), "loading notes");
-                    }
-                });
-    }
 
-    private void loadAbsenceStats() {
-        db.collectionGroup("notes")
-                .orderBy("derniereMiseAJour", Query.Direction.DESCENDING)
-                .limit(50).get()
-                .addOnCompleteListener(task -> {
-                    if (task.isSuccessful()) {
-                        List<Note> notes = new ArrayList<>();
-                        for (QueryDocumentSnapshot doc : task.getResult()) {
-                            Note note = doc.toObject(Note.class);
-                            note.setDocumentPath(doc.getReference().getPath());
-                            notes.add(note);
-                        }
-                        noteAdapter.mettreAJourListe(notes);
-                    }
-                });
-    }
+    private void loadDashboardDataFromMongo() {
+        apiService.getAdminDashboard().enqueue(new Callback<DashboardResponse>() {
+            @Override
+            public void onResponse(Call<DashboardResponse> call, Response<DashboardResponse> response) {
+                if (!response.isSuccessful() || response.body() == null) {
+                    Toast.makeText(AdminDashboard.this,
+                            "Erreur dashboard code=" + response.code(),
+                            Toast.LENGTH_LONG).show();
+                    return;
+                }
 
-    private void handleFirestoreError(Exception e, String action) {
-        Log.e("Firestore", "Error " + action, e);
-        if (e instanceof FirebaseFirestoreException) {
-            FirebaseFirestoreException fse = (FirebaseFirestoreException) e;
-            if (fse.getCode() == FirebaseFirestoreException.Code.FAILED_PRECONDITION) {
-                Toast.makeText(this, "Permissions or indexes missing.", Toast.LENGTH_LONG).show();
+                DashboardResponse data = response.body();
+
+                textTotalStudents.setText(String.valueOf(data.getTotalStudents()));
+                textTotalTeachers.setText(String.valueOf(data.getTotalTeachers()));
+                textTotalAbsences.setText(String.valueOf(data.getTotalAbsences()));
+
+                List<Note> notes = data.getRecentNotes();
+                if (notes == null) notes = new ArrayList<>();
+                noteAdapter.mettreAJourListe(notes);
             }
-        }
-        Toast.makeText(this, "Error " + action + ": " + e.getMessage(), Toast.LENGTH_LONG).show();
-    }
-    private void logout() {
-        findViewById(R.id.btnLogout).setOnClickListener(v -> {
-            FirebaseAuth.getInstance().signOut();
-            startActivity(new Intent(this, AdminActivity.class));
-            finish();
-        });
 
+            @Override
+            public void onFailure(Call<DashboardResponse> call, Throwable t) {
+                Toast.makeText(AdminDashboard.this,
+                        "Erreur réseau Mongo: " + t.getMessage(),
+                        Toast.LENGTH_LONG).show();
+            }
+        });
     }
+
 
     @Override
     protected void onResume() {
         super.onResume();
-        loadNotes();
-        loadAbsenceStats();
+        loadDashboardDataFromMongo();
     }
+
 }

@@ -4,8 +4,10 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
+
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
+
 import com.example.bbuniversity.R;
 import com.example.bbuniversity.models.Etudiant;
 
@@ -23,7 +25,7 @@ public class StudentAdapter extends RecyclerView.Adapter<StudentAdapter.StudentV
     private final OnStudentClickListener listener;
 
     public StudentAdapter(List<Etudiant> students, OnStudentClickListener listener) {
-        this.students = students != null ? students : new ArrayList<>();
+        this.students = (students != null) ? students : new ArrayList<>();
         this.listener = listener;
     }
 
@@ -47,11 +49,11 @@ public class StudentAdapter extends RecyclerView.Adapter<StudentAdapter.StudentV
 
     @Override
     public int getItemCount() {
-        return students != null ? students.size() : 0;
+        return (students != null) ? students.size() : 0;
     }
 
     public void updateList(List<Etudiant> newList) {
-        this.students = newList != null ? newList : new ArrayList<>();
+        this.students = (newList != null) ? newList : new ArrayList<>();
         notifyDataSetChanged();
     }
 
@@ -70,20 +72,38 @@ public class StudentAdapter extends RecyclerView.Adapter<StudentAdapter.StudentV
         }
 
         public void bind(@NonNull Etudiant student, @NonNull OnStudentClickListener listener) {
-            // Safe text setting with null checks
-            String fullName = (student.getPrenom() != null ? student.getPrenom() + " " : "") +
-                    (student.getNom() != null ? student.getNom() : "");
-            studentName.setText(fullName.trim().isEmpty() ? "No Name" : fullName);
 
-            studentEmail.setText(student.getEmail() != null ? student.getEmail() : "No Email");
-            studentClass.setText(student.getClasseCode() != null ? student.getClasseCode() : "No Class");
-            studentMatricule.setText(student.getMatricule() != null ? student.getMatricule() : "No ID");
+            // Nom complet
+            String prenom = student.getPrenom() != null ? student.getPrenom() : "";
+            String nom    = student.getNom() != null ? student.getNom() : "";
+            String fullName = (prenom + " " + nom).trim();
+            studentName.setText(fullName.isEmpty() ? "No Name" : fullName);
 
-            // Safe click listeners
+            // Email
+            String email = student.getEmail();
+            studentEmail.setText(email != null ? email : "No Email");
+
+            // Code classe (ex: 2AP2AP1) ou classe simple
+            String codeClasse = student.getCodeClasse();
+            if (codeClasse == null || codeClasse.trim().isEmpty()) {
+                // fallback sur le champ classe (ex: "2AP1")
+                String classe = student.getClasse();
+                studentClass.setText(classe != null && !classe.isEmpty() ? classe : "No Class");
+            } else {
+                studentClass.setText(codeClasse);
+            }
+
+            // Matricule (int → String)
+            int matricule = student.getMatricule();
+            if (matricule > 0) {
+                studentMatricule.setText(String.valueOf(matricule));
+            } else {
+                studentMatricule.setText("No ID");
+            }
+
+            // Clicks
             itemView.setOnClickListener(v -> {
-                if (listener != null) {
-                    listener.onStudentClick(student);
-                }
+                if (listener != null) listener.onStudentClick(student);
             });
 
             itemView.setOnLongClickListener(v -> {

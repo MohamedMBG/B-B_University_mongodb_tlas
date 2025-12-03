@@ -1,78 +1,89 @@
 package com.example.bbuniversity.models;
 
-import com.google.firebase.Timestamp;
-
 public class Note {
-    private String matiere;  // Changed from matiereId
-    private double participation;  // Changed from noteParticipation
-    private double controle;  // Changed from noteCC
-    private double examenFinal;  // Changed from noteExamen
-    private double noteGenerale;  // Changed from noteTotale
-    private Timestamp derniereMiseAJour;
+
+    private String _id;           // optionnel
+    private String studentId;
     private String professeurId;
-    private String documentPath;
+    private String matiere;       // ex: "MATH_101"
+
+    private double participation;
+    private double controle;
+    private double examenFinal;
+    private double noteGenerale;
+
+    private String derniereMiseAJour; // ou Date si tu veux
 
     public Note() {
+        // requis pour Gson
     }
 
-    // Getters and setters for all fields
-    public String getMatiere() {
-        return matiere;
+    public String getId() {
+        return _id;
     }
 
-    public void setMatiere(String matiere) {
-        this.matiere = matiere;
-    }
-
-    public double getParticipation() {
-        return participation;
-    }
-
-    public void setParticipation(double participation) {
-        this.participation = participation;
-    }
-
-    public double getControle() {
-        return controle;
-    }
-
-    public void setControle(double controle) {
-        this.controle = controle;
-    }
-
-    public double getExamenFinal() {
-        return examenFinal;
-    }
-
-    public void setExamenFinal(double examenFinal) {
-        this.examenFinal = examenFinal;
-    }
-
-    public double getNoteGenerale() {
-        return noteGenerale;
-    }
-
-    public void setNoteGenerale(double noteGenerale) {
-        this.noteGenerale = noteGenerale;
-    }
-
-    public Timestamp getDerniereMiseAJour() {
-        return derniereMiseAJour;
-    }
-
-    public void setDerniereMiseAJour(Timestamp derniereMiseAJour) {
-        this.derniereMiseAJour = derniereMiseAJour;
+    public String getStudentId() {
+        return studentId;
     }
 
     public String getProfesseurId() {
         return professeurId;
     }
 
+    public String getMatiere() {
+        return matiere;
+    }
+
+    public double getParticipation() {
+        return participation;
+    }
+
+    public double getControle() {
+        return controle;
+    }
+
+    public double getExamenFinal() {
+        return examenFinal;
+    }
+
+    public double getNoteGenerale() {
+        return noteGenerale;
+    }
+
+    public String getDerniereMiseAJour() {
+        return derniereMiseAJour;
+    }
+
+    // setters utiles si tu construis l’objet côté Java
+    public void setStudentId(String studentId) {
+        this.studentId = studentId;
+    }
+
     public void setProfesseurId(String professeurId) {
         this.professeurId = professeurId;
     }
 
-    // Add getter & setter
-    public String getDocumentPath() { return documentPath; }
-    public void setDocumentPath(String path) { this.documentPath = path; }
+    public void setMatiere(String matiere) {
+        this.matiere = matiere;
+    }
+
+    public void setParticipation(double participation) {
+        this.participation = participation;
+    }
+
+    public void setControle(double controle) {
+        this.controle = controle;
+    }
+
+    public void setExamenFinal(double examenFinal) {
+        this.examenFinal = examenFinal;
+    }
+
+    public void setNoteGenerale(double noteGenerale) {
+        this.noteGenerale = noteGenerale;
+    }
+
+    public void setDerniereMiseAJour(String derniereMiseAJour) {
+        this.derniereMiseAJour = derniereMiseAJour;
+    }
 }
